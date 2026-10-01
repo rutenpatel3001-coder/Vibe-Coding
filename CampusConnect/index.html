@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CampusConnect – Smart College Management Portal | VIT Pune</title>
+  <meta name="description" content="One Platform. Complete College Life. Smart College Management Portal for VIT Pune.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="loading-screen">
+    <div class="loading-logo">
+      <div class="loading-icon">🎓</div>
+      <h1>CampusConnect</h1>
+      <p>Smart College Management Portal</p>
+      <div class="loading-bar"><div class="loading-progress"></div></div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app"></div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal Container -->
+  <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+    <div id="modal-content" class="modal-content"></div>
+  </div>
+
+  <!-- AI Assistant -->
+  <div id="ai-assistant" class="ai-assistant hidden">
+    <div class="ai-header">
+      <div class="ai-header-left">
+        <div class="ai-avatar">🤖</div>
+        <div>
+          <div class="ai-title">Smart Campus Assistant</div>
+          <div class="ai-subtitle">Powered by CampusConnect AI</div>
+        </div>
+      </div>
+      <div class="ai-header-actions">
+        <button class="ai-btn" onclick="clearChat()" title="Clear chat">🗑️</button>
+        <button class="ai-btn" onclick="toggleAI()" title="Close">✕</button>
+      </div>
+    </div>
+    <div id="ai-messages" class="ai-messages">
+      <!-- Messages rendered by JS -->
+    </div>
+    <div class="ai-suggestions" id="ai-suggestions">
+      <!-- Suggestions rendered by JS -->
+    </div>
+    <div class="ai-input-area">
+      <input type="text" id="ai-input" class="ai-input" placeholder="Ask me anything..." onkeydown="handleAIInput(event)">
+      <button class="ai-send-btn" onclick="sendAIMessage()">➤</button>
+    </div>
+  </div>
+  <button id="ai-fab" class="ai-fab" onclick="toggleAI()" title="Smart Campus Assistant">
+    <span class="ai-fab-icon">🤖</span>
+    <span class="ai-fab-pulse"></span>
+  </button>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
