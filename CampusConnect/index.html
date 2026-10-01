@@ -10,6 +10,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script>
+    window.__errors = [];
+    window.onerror = function(msg, url, line, col, error) {
+      window.__errors.push({msg: msg, line: line, col: col});
+      var el = document.getElementById('debug-error-banner');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'debug-error-banner';
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:12px;z-index:999999;font-family:monospace;font-size:12px;';
+        document.body.appendChild(el);
+      }
+      el.innerHTML += '<div>❌ ' + msg + ' (Line ' + line + ')</div>';
+    };
+  </script>
 </head>
 <body>
   <!-- Loading Screen -->
@@ -64,7 +78,24 @@
     <span class="ai-fab-pulse"></span>
   </button>
 
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+  <script>
+    function loadScript(src) {
+      var s = document.createElement('script');
+      s.src = src;
+      s.onerror = function() {
+        var el = document.getElementById('debug-error-banner');
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'debug-error-banner';
+          el.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc2626;color:white;padding:12px;z-index:999999;font-family:monospace;font-size:12px;';
+          document.body.appendChild(el);
+        }
+        el.innerHTML += '<div>❌ Failed to load/parse: ' + src + '</div>';
+      };
+      document.body.appendChild(s);
+    }
+    loadScript('data.js');
+    setTimeout(function() { loadScript('app.js'); }, 100);
+  </script>
 </body>
 </html>

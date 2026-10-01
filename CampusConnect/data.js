@@ -639,7 +639,7 @@ const APP_DATA = {
       deadline: '2026-10-15', driveDate: '2026-10-20',
       rounds: ['Online Coding Test (2 hrs)', 'Technical Interview 1', 'Technical Interview 2', 'HR Interview'],
       status: 'upcoming',
-      description: 'Google is hiring Software Engineers for its Bangalore office. Roles include backend engineering, ML engineering, and Site Reliability Engineering. All selected engineers go through Google\\'s 3-week Noogler orientation.'
+      description: "Google is hiring Software Engineers for its Bangalore office. Roles include backend engineering, ML engineering, and Site Reliability Engineering. All selected engineers go through Google's 3-week Noogler orientation."
     },
     {
       id: 'PL002', company: 'Microsoft', emoji: '🟦',

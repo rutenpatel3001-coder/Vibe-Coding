@@ -1,202 +1,176 @@
 // ============================================================
-//  CampusConnect – Main Application JavaScript
-//  Vishwakarma Institute of Technology, Pune
+// CampusConnect – Smart College Management Portal
+// Main Application Script
 // ============================================================
 
-// ─────────────────────────────────────────────────────────────
-// STATE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
+// STATE MANAGEMENT
+// ============================================================
 const APP_STATE = {
   currentUser: null,
   currentPage: 'landing',
-  currentTheme: localStorage.getItem('theme') || 'light',
+  currentTheme: localStorage.getItem('cc-theme') || 'light',
   sidebarOpen: window.innerWidth > 1024,
   notifications: [],
   charts: {},
   selectedSemester: 5,
-  attendanceFilter: 'all',
-  assignmentFilter: 'all',
-  eventFilter: 'upcoming',
-  notifFilter: 'all',
+  aiOpen: false
 };
 
-// ─────────────────────────────────────────────────────────────
-// INIT
-// ─────────────────────────────────────────────────────────────
+// ============================================================
+// INITIALIZATION
+// ============================================================
 document.addEventListener('DOMContentLoaded', () => {
+  // Apply saved theme
   document.documentElement.setAttribute('data-theme', APP_STATE.currentTheme);
+  
+  // Loading screen
   setTimeout(() => {
     const ls = document.getElementById('loading-screen');
     if (ls) {
-      ls.style.transition = 'opacity 0.3s';
       ls.style.opacity = '0';
+      ls.style.transition = 'opacity 0.3s ease';
       setTimeout(() => {
         ls.style.display = 'none';
         renderPage('landing');
-      }, 300);
+      }, 350);
     }
-  }, 1500);
+  }, 1600);
+
+  // Global click handler for dropdowns
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.user-menu')) {
+      const d = document.getElementById('user-dropdown');
+      if (d) d.classList.remove('visible');
+    }
+    if (!e.target.closest('.nav-login-dropdown')) {
+      const m = document.getElementById('nav-login-menu');
+      if (m) m.classList.remove('visible');
+    }
+  });
 });
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ROUTER
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderPage(page, params = {}) {
   APP_STATE.currentPage = page;
   const app = document.getElementById('app');
   if (!app) return;
 
-  // Destroy old charts
-  Object.values(APP_STATE.charts).forEach(c => { try { c.destroy(); } catch(e) {} });
+  // Destroy old Chart.js instances
+  Object.values(APP_STATE.charts).forEach(c => {
+    try { c.destroy(); } catch (e) { }
+  });
   APP_STATE.charts = {};
 
   // Show/hide AI FAB
   const fab = document.getElementById('ai-fab');
   if (fab) fab.classList.toggle('hidden', !APP_STATE.currentUser);
 
+  // Route
   switch (page) {
-    case 'landing':               app.innerHTML = renderLanding(); break;
-    case 'login':                 app.innerHTML = renderLogin(params.role || 'student'); break;
-    case 'student-dashboard':     app.innerHTML = renderAppShell(renderStudentDashboard()); bindSidebarEvents(); break;
-    case 'student-attendance':    app.innerHTML = renderAppShell(renderStudentAttendance()); bindSidebarEvents(); break;
-    case 'student-cgpa':          app.innerHTML = renderAppShell(renderStudentCGPA()); bindSidebarEvents(); setTimeout(renderCGPACharts, 100); break;
-    case 'student-timetable':     app.innerHTML = renderAppShell(renderStudentTimetable()); bindSidebarEvents(); break;
-    case 'student-assignments':   app.innerHTML = renderAppShell(renderStudentAssignments()); bindSidebarEvents(); break;
-    case 'student-exams':         app.innerHTML = renderAppShell(renderStudentExams()); bindSidebarEvents(); break;
-    case 'student-events':        app.innerHTML = renderAppShell(renderEvents()); bindSidebarEvents(); break;
-    case 'student-notices':       app.innerHTML = renderAppShell(renderNotices()); bindSidebarEvents(); break;
-    case 'student-resources':     app.innerHTML = renderAppShell(renderStudyResources()); bindSidebarEvents(); break;
-    case 'student-leave':         app.innerHTML = renderAppShell(renderLeaveApplication()); bindSidebarEvents(); break;
-    case 'student-services':      app.innerHTML = renderAppShell(renderCampusServices()); bindSidebarEvents(); break;
-    case 'student-complaints':    app.innerHTML = renderAppShell(renderComplaints()); bindSidebarEvents(); break;
-    case 'student-profile':       app.innerHTML = renderAppShell(renderStudentProfile()); bindSidebarEvents(); break;
-    case 'student-clubs':         app.innerHTML = renderAppShell(renderClubs()); bindSidebarEvents(); break;
-    case 'student-placements':    app.innerHTML = renderAppShell(renderPlacements()); bindSidebarEvents(); break;
-    case 'faculty-dashboard':     app.innerHTML = renderAppShell(renderFacultyDashboard()); bindSidebarEvents(); setTimeout(renderFacultyCharts, 100); break;
-    case 'faculty-attendance':    app.innerHTML = renderAppShell(renderFacultyAttendance()); bindSidebarEvents(); break;
-    case 'faculty-assignments':   app.innerHTML = renderAppShell(renderFacultyAssignments()); bindSidebarEvents(); break;
-    case 'faculty-students':      app.innerHTML = renderAppShell(renderFacultyStudents()); bindSidebarEvents(); break;
-    case 'faculty-marks':         app.innerHTML = renderAppShell(renderFacultyMarks()); bindSidebarEvents(); break;
-    case 'faculty-leave-requests':app.innerHTML = renderAppShell(renderLeaveRequests()); bindSidebarEvents(); break;
-    case 'faculty-notices':       app.innerHTML = renderAppShell(renderNotices()); bindSidebarEvents(); break;
-    case 'faculty-timetable':     app.innerHTML = renderAppShell(renderFacultyTimetable()); bindSidebarEvents(); break;
-    case 'admin-dashboard':       app.innerHTML = renderAppShell(renderAdminDashboard()); bindSidebarEvents(); setTimeout(renderAdminCharts, 100); break;
-    case 'admin-students':        app.innerHTML = renderAppShell(renderAdminStudents()); bindSidebarEvents(); break;
-    case 'admin-faculty':         app.innerHTML = renderAppShell(renderAdminFaculty()); bindSidebarEvents(); break;
-    case 'admin-events':          app.innerHTML = renderAppShell(renderAdminEvents()); bindSidebarEvents(); break;
-    case 'admin-notices':         app.innerHTML = renderAppShell(renderAdminNotices()); bindSidebarEvents(); break;
-    case 'admin-applications':    app.innerHTML = renderAppShell(renderAdminApplications()); bindSidebarEvents(); break;
-    case 'admin-reports':         app.innerHTML = renderAppShell(renderAdminReports()); bindSidebarEvents(); setTimeout(renderAdminCharts, 100); break;
-    case 'admin-settings':        app.innerHTML = renderAppShell(renderAdminSettings()); bindSidebarEvents(); break;
-    case 'events':                app.innerHTML = renderAppShell(renderEvents()); bindSidebarEvents(); break;
-    case 'notices':               app.innerHTML = renderAppShell(renderNotices()); bindSidebarEvents(); break;
-    case 'faculty-directory':     app.innerHTML = renderAppShell(renderFacultyDirectory()); bindSidebarEvents(); break;
-    case 'notifications':         app.innerHTML = renderAppShell(renderNotificationsPage()); bindSidebarEvents(); break;
-    default:                      renderPage('landing');
+    case 'landing':   app.innerHTML = renderLanding(); initLanding(); break;
+    case 'login':     app.innerHTML = renderLogin(params.role || 'student'); break;
+
+    // Student pages
+    case 'student-dashboard':   renderShell(renderStudentDashboard()); break;
+    case 'student-attendance':  renderShell(renderStudentAttendance()); break;
+    case 'student-cgpa':        renderShell(renderStudentCGPA()); setTimeout(renderCGPACharts, 100); break;
+    case 'student-timetable':   renderShell(renderStudentTimetable()); break;
+    case 'student-assignments': renderShell(renderStudentAssignments()); break;
+    case 'student-exams':       renderShell(renderStudentExams()); break;
+    case 'student-events':      renderShell(renderEventsPage()); break;
+    case 'student-notices':     renderShell(renderNoticesPage()); break;
+    case 'student-resources':   renderShell(renderStudyResources()); break;
+    case 'student-leave':       renderShell(renderLeaveApplication()); break;
+    case 'student-services':    renderShell(renderCampusServices()); break;
+    case 'student-complaints':  renderShell(renderComplaints()); break;
+    case 'student-profile':     renderShell(renderStudentProfile()); break;
+    case 'student-clubs':       renderShell(renderClubs()); break;
+    case 'student-placements':  renderShell(renderPlacements()); break;
+
+    // Faculty pages
+    case 'faculty-dashboard':       renderShell(renderFacultyDashboard()); setTimeout(renderFacultyCharts, 100); break;
+    case 'faculty-attendance':      renderShell(renderFacultyAttendance()); break;
+    case 'faculty-assignments':     renderShell(renderFacultyAssignments()); break;
+    case 'faculty-students':        renderShell(renderFacultyStudents()); break;
+    case 'faculty-marks':           renderShell(renderFacultyMarks()); break;
+    case 'faculty-leave-requests':  renderShell(renderLeaveRequests()); break;
+    case 'faculty-notices':         renderShell(renderNoticesPage()); break;
+    case 'faculty-timetable':       renderShell(renderFacultyTimetable()); break;
+
+    // Admin pages
+    case 'admin-dashboard':     renderShell(renderAdminDashboard()); setTimeout(renderAdminCharts, 100); break;
+    case 'admin-students':      renderShell(renderAdminStudents()); break;
+    case 'admin-faculty':       renderShell(renderAdminFaculty()); break;
+    case 'admin-events':        renderShell(renderAdminEvents()); break;
+    case 'admin-notices':       renderShell(renderAdminNotices()); break;
+    case 'admin-applications':  renderShell(renderAdminApplications()); break;
+    case 'admin-reports':       renderShell(renderAdminReports()); setTimeout(renderAdminCharts, 100); break;
+    case 'admin-settings':      renderShell(renderAdminSettings()); break;
+
+    // Shared pages
+    case 'events':            renderShell(renderEventsPage()); break;
+    case 'notices':           renderShell(renderNoticesPage()); break;
+    case 'faculty-directory': renderShell(renderFacultyDirectory()); break;
+    case 'notifications':     renderShell(renderNotificationsPage()); break;
+
+    default: renderPage('landing');
   }
 
+  window.scrollTo(0, 0);
   updateActiveSidebarItem();
   initAISuggestions();
 }
 
-// ─────────────────────────────────────────────────────────────
-// AUTH
-// ─────────────────────────────────────────────────────────────
+function renderShell(content) {
+  const app = document.getElementById('app');
+  app.innerHTML = renderAppShell(content);
+  bindSidebarEvents();
+}
+
+// ============================================================
+// AUTHENTICATION
+// ============================================================
 function login(userId, password) {
-  const user = APP_DATA.users.find(u => u.id === userId && u.password === password);
+  const user = APP_DATA.users.find(u => u.id.trim() === userId.trim() && u.password === password.trim());
   if (user) {
     APP_STATE.currentUser = user;
-    const userNotifs = APP_DATA.notifications[user.id] || [];
-    APP_STATE.notifications = userNotifs;
-    showToast(`Welcome back, ${user.name}!`, 'success');
+    APP_STATE.notifications = APP_DATA.notifications.filter(n =>
+      n.userId === user.id || user.role === 'admin'
+    );
+    showToast(`Welcome back, ${user.name.split(' ')[0]}! 👋`, 'success');
     if (user.role === 'student') renderPage('student-dashboard');
     else if (user.role === 'faculty') renderPage('faculty-dashboard');
     else if (user.role === 'admin') renderPage('admin-dashboard');
   } else {
-    showToast('Invalid credentials. Please try again.', 'error');
-    const btn = document.querySelector('.login-btn');
-    if (btn) { btn.classList.add('shake'); setTimeout(() => btn.classList.remove('shake'), 500); }
+    showToast('Invalid credentials. Please check your ID and password.', 'error');
+    const errorEl = document.getElementById('login-error');
+    if (errorEl) {
+      errorEl.textContent = 'Invalid ID or password. Try the demo credentials shown above.';
+      errorEl.style.display = 'block';
+    }
   }
 }
 
 function logout() {
   APP_STATE.currentUser = null;
-  APP_STATE.notifications = [];
-  // Close AI panel if open
-  const panel = document.getElementById('ai-assistant');
-  if (panel) panel.classList.add('hidden');
-  showToast('Logged out successfully.', 'info');
+  // Close AI panel
+  const ai = document.getElementById('ai-assistant');
+  if (ai) ai.classList.add('hidden');
+  showToast('Logged out successfully. See you soon!', 'info');
   renderPage('landing');
 }
 
-// ─────────────────────────────────────────────────────────────
-// NAV ITEMS
-// ─────────────────────────────────────────────────────────────
-function getNavItems(role) {
-  const unread = APP_STATE.notifications.filter(n => !n.isRead).length;
-  if (role === 'student') return [
-    { icon: '🏠', label: 'Dashboard', page: 'student-dashboard' },
-    { type: 'separator', label: 'ACADEMICS' },
-    { icon: '📊', label: 'My CGPA', page: 'student-cgpa' },
-    { icon: '📅', label: 'Attendance', page: 'student-attendance' },
-    { icon: '⏰', label: 'Timetable', page: 'student-timetable' },
-    { icon: '📝', label: 'Assignments', page: 'student-assignments' },
-    { icon: '📚', label: 'Exams', page: 'student-exams' },
-    { icon: '📰', label: 'Notices', page: 'student-notices' },
-    { type: 'separator', label: 'RESOURCES' },
-    { icon: '💾', label: 'Study Materials', page: 'student-resources' },
-    { icon: '🎓', label: 'Faculty Directory', page: 'faculty-directory' },
-    { type: 'separator', label: 'CAMPUS LIFE' },
-    { icon: '🎉', label: 'Events', page: 'student-events' },
-    { icon: '🤝', label: 'Clubs', page: 'student-clubs' },
-    { icon: '💼', label: 'Placements', page: 'student-placements' },
-    { type: 'separator', label: 'SERVICES' },
-    { icon: '📝', label: 'Apply Leave', page: 'student-leave' },
-    { icon: '🏢', label: 'Campus Services', page: 'student-services' },
-    { icon: '📣', label: 'Complaints', page: 'student-complaints' },
-    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
-    { type: 'separator', label: 'ACCOUNT' },
-    { icon: '👤', label: 'My Profile', page: 'student-profile' },
-  ];
-  if (role === 'faculty') return [
-    { icon: '🏠', label: 'Dashboard', page: 'faculty-dashboard' },
-    { type: 'separator', label: 'TEACHING' },
-    { icon: '📅', label: 'Attendance', page: 'faculty-attendance' },
-    { icon: '⏰', label: 'My Timetable', page: 'faculty-timetable' },
-    { icon: '📝', label: 'Assignments', page: 'faculty-assignments' },
-    { icon: '📊', label: 'Marks Entry', page: 'faculty-marks' },
-    { icon: '👨‍🎓', label: 'My Students', page: 'faculty-students' },
-    { type: 'separator', label: 'MANAGEMENT' },
-    { icon: '📋', label: 'Leave Requests', page: 'faculty-leave-requests' },
-    { icon: '📰', label: 'Notices', page: 'faculty-notices' },
-    { icon: '🎉', label: 'Events', page: 'events' },
-    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
-  ];
-  if (role === 'admin') return [
-    { icon: '🏠', label: 'Dashboard', page: 'admin-dashboard' },
-    { type: 'separator', label: 'MANAGEMENT' },
-    { icon: '👨‍🎓', label: 'Students', page: 'admin-students' },
-    { icon: '👨‍🏫', label: 'Faculty', page: 'admin-faculty' },
-    { icon: '🎉', label: 'Events', page: 'admin-events' },
-    { icon: '📰', label: 'Notices', page: 'admin-notices' },
-    { type: 'separator', label: 'OPERATIONS' },
-    { icon: '📋', label: 'Applications', page: 'admin-applications' },
-    { icon: '📊', label: 'Reports', page: 'admin-reports' },
-    { icon: '⚙️', label: 'Settings', page: 'admin-settings' },
-    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
-  ];
-  return [];
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // APP SHELL
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAppShell(content) {
   const user = APP_STATE.currentUser;
   if (!user) { renderPage('landing'); return ''; }
   const navItems = getNavItems(user.role);
-  const unreadCount = APP_STATE.notifications.filter(n => !n.isRead).length;
-  const roleColor = user.role === 'student' ? 'primary' : user.role === 'faculty' ? 'info' : 'purple';
+  const unread = APP_STATE.notifications.filter(n => !n.read).length;
 
   return `
   <div class="app-container">
@@ -206,23 +180,23 @@ function renderAppShell(content) {
           <span class="logo-icon">🎓</span>
           <span class="logo-text">CampusConnect</span>
         </div>
-        <button class="sidebar-close-btn" onclick="toggleSidebar()" title="Close sidebar">✕</button>
+        <button class="sidebar-close-btn" onclick="toggleSidebar()">✕</button>
       </div>
       <div class="sidebar-user">
         <div class="sidebar-avatar">${user.name[0]}</div>
         <div class="sidebar-user-info">
           <div class="sidebar-user-name">${user.name}</div>
-          <div class="badge badge-${roleColor}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</div>
+          <span class="badge badge-${user.role === 'student' ? 'primary' : user.role === 'faculty' ? 'teal' : 'purple'}">${capitalize(user.role)}</span>
         </div>
       </div>
       <nav class="sidebar-nav">
         ${navItems.map(item => item.type === 'separator'
           ? `<div class="nav-separator">${item.label}</div>`
-          : `<a href="#" class="nav-item" data-page="${item.page}" onclick="navigate('${item.page}'); return false;">
-               <span class="nav-icon">${item.icon}</span>
-               <span class="nav-label">${item.label}</span>
-               ${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}
-             </a>`
+          : `<a href="#" class="nav-item" data-page="${item.page}" onclick="navigate('${item.page}');return false;">
+              <span class="nav-icon">${item.icon}</span>
+              <span class="nav-label">${item.label}</span>
+              ${item.badge ? `<span class="nav-badge">${item.badge}</span>` : ''}
+            </a>`
         ).join('')}
       </nav>
       <div class="sidebar-footer">
@@ -238,176 +212,212 @@ function renderAppShell(content) {
     <div class="main-wrapper">
       <header class="topbar">
         <div class="topbar-left">
-          <button class="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">
+          <button class="hamburger" onclick="toggleSidebar()">
             <span></span><span></span><span></span>
           </button>
-          <div class="topbar-logo-mobile" onclick="navigate('${user.role}-dashboard')">
-            <span>🎓</span> CampusConnect
-          </div>
+          <div class="topbar-logo-mobile">🎓 CampusConnect</div>
         </div>
         <div class="topbar-center">
           <div class="search-container">
             <span class="search-icon">🔍</span>
-            <input type="text" class="search-input" placeholder="Search students, events, notices..."
+            <input type="text" class="search-input" placeholder="Search events, notices, faculty..."
               oninput="handleGlobalSearch(this.value)"
               onfocus="showSearchDropdown()"
-              onblur="setTimeout(hideSearchDropdown, 200)"
-              autocomplete="off">
+              onblur="setTimeout(hideSearchDropdown,200)">
             <div class="search-dropdown" id="search-dropdown"></div>
           </div>
         </div>
         <div class="topbar-right">
-          <button class="topbar-btn" onclick="toggleTheme()" title="Toggle theme">
+          <button class="topbar-btn" onclick="toggleTheme()" title="Toggle dark/light mode">
             <span id="theme-icon">${APP_STATE.currentTheme === 'dark' ? '☀️' : '🌙'}</span>
           </button>
-          <button class="topbar-btn notification-btn" onclick="navigate('notifications')" title="Notifications">
+          <button class="topbar-btn" onclick="navigate('notifications')" title="Notifications" style="position:relative">
             🔔
-            ${unreadCount > 0 ? `<span class="notification-badge">${unreadCount}</span>` : ''}
+            ${unread > 0 ? `<span class="notification-badge">${unread}</span>` : ''}
           </button>
           <div class="user-menu">
             <button class="user-avatar-btn" onclick="toggleUserMenu()">
               <div class="user-avatar">${user.name[0]}</div>
               <span class="user-name-short">${user.name.split(' ')[0]}</span>
-              <span class="caret">▾</span>
+              <span>▾</span>
             </button>
             <div class="user-dropdown" id="user-dropdown">
               <div class="user-dropdown-header">
-                <div class="user-avatar user-avatar-lg">${user.name[0]}</div>
+                <div class="user-avatar">${user.name[0]}</div>
                 <div>
-                  <div class="font-semibold">${user.name}</div>
-                  <div class="text-muted text-sm">${user.email || user.id}</div>
+                  <div class="font-semibold text-sm">${user.name}</div>
+                  <div class="text-muted text-xs">${user.email || user.id}</div>
                 </div>
               </div>
               <div class="user-dropdown-divider"></div>
-              ${user.role === 'student' ? `<a href="#" onclick="navigate('student-profile'); return false;" class="user-dropdown-item">👤 My Profile</a>` : ''}
-              <a href="#" onclick="toggleTheme(); return false;" class="user-dropdown-item">🌙 Toggle Theme</a>
+              ${user.role === 'student' ? `<a href="#" onclick="navigate('student-profile');return false;" class="user-dropdown-item">👤 My Profile</a>` : ''}
+              <a href="#" onclick="navigate('notifications');return false;" class="user-dropdown-item">🔔 Notifications ${unread > 0 ? `<span class="nav-badge" style="margin-left:auto">${unread}</span>` : ''}</a>
+              <a href="#" onclick="toggleTheme();return false;" class="user-dropdown-item">🌙 Toggle Theme</a>
               <div class="user-dropdown-divider"></div>
-              <a href="#" onclick="logout(); return false;" class="user-dropdown-item text-danger">🚪 Logout</a>
+              <a href="#" onclick="logout();return false;" class="user-dropdown-item text-danger">🚪 Logout</a>
             </div>
           </div>
         </div>
       </header>
-
-      <main class="main-content" id="main-content">
-        ${content}
-      </main>
+      <main class="main-content" id="main-content">${content}</main>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+function getNavItems(role) {
+  const unread = APP_STATE.notifications.filter(n => !n.read).length;
+  const pending = APP_DATA.assignments.filter(a => {
+    if (APP_STATE.currentUser && a.studentStatus[APP_STATE.currentUser.id] === 'pending') return true;
+    if (APP_STATE.currentUser && !a.studentStatus[APP_STATE.currentUser.id]) return true;
+    return false;
+  }).length;
+
+  if (role === 'student') return [
+    { icon: '🏠', label: 'Dashboard', page: 'student-dashboard' },
+    { type: 'separator', label: 'ACADEMICS' },
+    { icon: '📊', label: 'My CGPA', page: 'student-cgpa' },
+    { icon: '📅', label: 'Attendance', page: 'student-attendance' },
+    { icon: '⏰', label: 'Timetable', page: 'student-timetable' },
+    { icon: '📝', label: 'Assignments', page: 'student-assignments', badge: pending || null },
+    { icon: '📚', label: 'Exams', page: 'student-exams' },
+    { icon: '📢', label: 'Notices', page: 'student-notices' },
+    { type: 'separator', label: 'RESOURCES' },
+    { icon: '💾', label: 'Study Materials', page: 'student-resources' },
+    { icon: '👨‍🏫', label: 'Faculty Directory', page: 'faculty-directory' },
+    { type: 'separator', label: 'CAMPUS LIFE' },
+    { icon: '🎉', label: 'Events', page: 'student-events' },
+    { icon: '🤝', label: 'Clubs', page: 'student-clubs' },
+    { icon: '💼', label: 'Placements', page: 'student-placements' },
+    { type: 'separator', label: 'SERVICES' },
+    { icon: '📋', label: 'Apply Leave', page: 'student-leave' },
+    { icon: '🏢', label: 'Campus Services', page: 'student-services' },
+    { icon: '📣', label: 'Complaints', page: 'student-complaints' },
+    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
+    { type: 'separator', label: 'ACCOUNT' },
+    { icon: '👤', label: 'My Profile', page: 'student-profile' },
+  ];
+
+  if (role === 'faculty') return [
+    { icon: '🏠', label: 'Dashboard', page: 'faculty-dashboard' },
+    { type: 'separator', label: 'TEACHING' },
+    { icon: '📅', label: 'Attendance', page: 'faculty-attendance' },
+    { icon: '⏰', label: 'My Timetable', page: 'faculty-timetable' },
+    { icon: '📝', label: 'Assignments', page: 'faculty-assignments' },
+    { icon: '📊', label: 'Marks Entry', page: 'faculty-marks' },
+    { icon: '👨‍🎓', label: 'My Students', page: 'faculty-students' },
+    { type: 'separator', label: 'MANAGEMENT' },
+    { icon: '📋', label: 'Leave Requests', page: 'faculty-leave-requests', badge: APP_DATA.leaveApplications.filter(l => l.status === 'pending').length || null },
+    { icon: '📢', label: 'Notices', page: 'faculty-notices' },
+    { icon: '🎉', label: 'Events', page: 'events' },
+    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
+  ];
+
+  if (role === 'admin') return [
+    { icon: '🏠', label: 'Dashboard', page: 'admin-dashboard' },
+    { type: 'separator', label: 'MANAGEMENT' },
+    { icon: '👨‍🎓', label: 'Students', page: 'admin-students' },
+    { icon: '👨‍🏫', label: 'Faculty', page: 'admin-faculty' },
+    { icon: '🎉', label: 'Events', page: 'admin-events' },
+    { icon: '📢', label: 'Notices', page: 'admin-notices' },
+    { type: 'separator', label: 'OPERATIONS' },
+    { icon: '📋', label: 'Applications', page: 'admin-applications', badge: APP_DATA.adminStats.pendingApplications || null },
+    { icon: '📊', label: 'Reports', page: 'admin-reports' },
+    { icon: '⚙️', label: 'Settings', page: 'admin-settings' },
+    { icon: '🔔', label: 'Notifications', page: 'notifications', badge: unread || null },
+  ];
+  return [];
+}
+
+// ============================================================
 // LANDING PAGE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderLanding() {
-  const notices = APP_DATA.notices.slice(0, 3);
-  const events = APP_DATA.events.filter(e => e.status === 'upcoming').slice(0, 3);
-  const college = APP_DATA.college;
+  const c = APP_DATA.college;
+  const upcoming = APP_DATA.events.filter(e => e.status === 'upcoming').slice(0, 3);
+  const importantNotices = APP_DATA.notices.slice(0, 3);
 
   return `
   <div class="landing-page">
     <!-- Navbar -->
     <nav class="landing-nav">
-      <div class="landing-nav-inner">
-        <div class="landing-logo">
-          <span class="logo-icon">🎓</span>
-          <div>
-            <div class="landing-logo-name">CampusConnect</div>
-            <div class="landing-logo-sub">${college.shortName}</div>
-          </div>
-        </div>
-        <div class="landing-nav-links">
-          <a href="#hero" class="landing-nav-link">Home</a>
-          <a href="#features" class="landing-nav-link">Features</a>
-          <a href="#events-section" class="landing-nav-link">Events</a>
-          <a href="#announcements" class="landing-nav-link">Notices</a>
-          <a href="#footer" class="landing-nav-link">Contact</a>
-        </div>
-        <div class="landing-nav-actions">
-          <button class="btn btn-ghost" onclick="toggleTheme()" title="Toggle theme">
-            ${APP_STATE.currentTheme === 'dark' ? '☀️' : '🌙'}
+      <div class="nav-brand">🎓 CampusConnect</div>
+      <div class="nav-links">
+        <a href="#">Home</a>
+        <a href="#">About</a>
+        <a href="#">Academics</a>
+        <a href="#">Events</a>
+        <a href="#">Contact</a>
+      </div>
+      <div class="nav-actions">
+        <button class="topbar-btn" onclick="toggleTheme()" style="border:1px solid var(--border);border-radius:8px;width:36px;height:36px;" title="Toggle theme">
+          <span id="landing-theme-icon">${APP_STATE.currentTheme === 'dark' ? '☀️' : '🌙'}</span>
+        </button>
+        <div class="nav-login-dropdown">
+          <button class="nav-login-btn" onclick="toggleNavLoginMenu()">
+            Login <span>▾</span>
           </button>
-          <div class="login-dropdown-wrapper">
-            <button class="btn btn-primary" onclick="toggleLoginDropdown()">
-              Login <span>▾</span>
-            </button>
-            <div class="login-dropdown" id="login-dropdown">
-              <div class="login-dropdown-item" onclick="renderPage('login', {role:'student'})">
-                <span class="login-dropdown-icon">👨‍🎓</span>
-                <div>
-                  <div class="font-semibold">Student Login</div>
-                  <div class="text-sm text-muted">Access your academics</div>
-                </div>
-              </div>
-              <div class="login-dropdown-item" onclick="renderPage('login', {role:'faculty'})">
-                <span class="login-dropdown-icon">👨‍🏫</span>
-                <div>
-                  <div class="font-semibold">Faculty Login</div>
-                  <div class="text-sm text-muted">Manage your classes</div>
-                </div>
-              </div>
-              <div class="login-dropdown-item" onclick="renderPage('login', {role:'admin'})">
-                <span class="login-dropdown-icon">🛡️</span>
-                <div>
-                  <div class="font-semibold">Admin Login</div>
-                  <div class="text-sm text-muted">College administration</div>
-                </div>
-              </div>
-            </div>
+          <div class="nav-login-menu" id="nav-login-menu">
+            <a href="#" onclick="navigate('login',{role:'student'});return false;">🎓 Student Login</a>
+            <a href="#" onclick="navigate('login',{role:'faculty'});return false;">👨‍🏫 Faculty Login</a>
+            <a href="#" onclick="navigate('login',{role:'admin'});return false;">🔑 Admin Login</a>
           </div>
         </div>
       </div>
     </nav>
 
     <!-- Hero -->
-    <section class="hero-section" id="hero">
+    <section class="hero">
       <div class="hero-content">
         <div class="hero-text">
-          <div class="hero-badge">🏆 NAAC Accredited – Grade A+</div>
-          <h1 class="hero-title">Smart College<br><span class="hero-title-accent">Management Portal</span></h1>
-          <p class="hero-subtitle">${college.tagline}. Streamline academics, attendance, events, placements, and campus life – all in one unified platform.</p>
-          <div class="hero-ctas">
-            <button class="btn btn-primary btn-lg" onclick="renderPage('login', {role:'student'})">
-              👨‍🎓 Student Login
+          <div class="hero-badge">🏆 NAAC Grade A+ Accredited</div>
+          <h1 class="hero-title">
+            Smart College<br>
+            <span class="highlight">Management Portal</span>
+          </h1>
+          <p class="hero-subtitle">
+            ${c.name} — One Platform, Complete College Life.
+            Students, faculty, and administrators connected seamlessly.
+          </p>
+          <div class="hero-actions">
+            <button class="btn-hero-primary" onclick="navigate('login',{role:'student'})">
+              🎓 Student Login
             </button>
-            <button class="btn btn-outline btn-lg" onclick="renderPage('login', {role:'faculty'})">
+            <button class="btn-hero-secondary" onclick="navigate('login',{role:'faculty'})">
               👨‍🏫 Faculty Login
             </button>
           </div>
-          <div class="hero-meta">
-            <span>🔒 Secure Portal</span>
-            <span>📱 Mobile Friendly</span>
-            <span>🤖 AI Assistant</span>
-          </div>
         </div>
         <div class="hero-visual">
-          <div class="hero-card-stack">
-            <div class="hero-card hero-card-main">
-              <div class="hero-card-header">
-                <div class="hero-card-avatar">A</div>
-                <div>
-                  <div class="font-semibold">Aarav Patel</div>
-                  <div class="text-sm text-muted">CSE – Semester 5</div>
-                </div>
-                <span class="badge badge-success">Active</span>
-              </div>
-              <div class="hero-card-stats">
-                <div class="hero-stat"><div class="hero-stat-val">8.76</div><div class="hero-stat-lbl">CGPA</div></div>
-                <div class="hero-stat"><div class="hero-stat-val">84.2%</div><div class="hero-stat-lbl">Attendance</div></div>
-                <div class="hero-stat"><div class="hero-stat-val">3</div><div class="hero-stat-lbl">Pending</div></div>
+          <div class="hero-card">
+            <div class="hero-card-header">
+              <div class="hero-card-avatar">A</div>
+              <div>
+                <div style="font-weight:700;font-size:0.9375rem;">Aarav Patel</div>
+                <div style="font-size:0.75rem;opacity:0.8;">CSE – Semester 5</div>
               </div>
             </div>
-            <div class="hero-card hero-card-notif">
-              <span>🔔</span>
-              <div>
-                <div class="text-sm font-semibold">Assignment Evaluated</div>
-                <div class="text-xs text-muted">A* Search – 18/20</div>
+            <div class="hero-stat-row">
+              <div class="hero-stat">
+                <div class="hero-stat-value">8.76</div>
+                <div class="hero-stat-label">CGPA</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-value">84.2%</div>
+                <div class="hero-stat-label">Attendance</div>
               </div>
             </div>
-            <div class="hero-card hero-card-event">
-              <span>🎉</span>
-              <div>
-                <div class="text-sm font-semibold">VIT HackFusion 2024</div>
-                <div class="text-xs text-muted">Nov 8 – 10 • Registered ✓</div>
+            <div class="hero-mini-list">
+              <div class="hero-mini-item">
+                <span>📝 ML Assignment</span>
+                <span style="font-size:0.75rem;opacity:0.7;">Due Oct 10</span>
+              </div>
+              <div class="hero-mini-item">
+                <span>📅 Next: Web Tech</span>
+                <span style="font-size:0.75rem;opacity:0.7;">10:00 AM, A-301</span>
+              </div>
+              <div class="hero-mini-item">
+                <span>🎉 Hackathon 2026</span>
+                <span style="font-size:0.75rem;opacity:0.7;">Registered ✓</span>
               </div>
             </div>
           </div>
@@ -416,850 +426,897 @@ function renderLanding() {
     </section>
 
     <!-- Stats Strip -->
-    <section class="stats-strip">
+    <div class="stats-strip">
       <div class="stats-strip-inner">
-        <div class="stat-item">
-          <div class="stat-number">4,850+</div>
-          <div class="stat-label">Students</div>
+        <div class="stat-strip-item">
+          <div class="stat-strip-value">4,850+</div>
+          <div class="stat-strip-label">Total Students</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-number">312+</div>
-          <div class="stat-label">Faculty Members</div>
+        <div class="stat-strip-item">
+          <div class="stat-strip-value">312+</div>
+          <div class="stat-strip-label">Expert Faculty</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-number">12</div>
-          <div class="stat-label">Departments</div>
+        <div class="stat-strip-item">
+          <div class="stat-strip-value">12</div>
+          <div class="stat-strip-label">Departments</div>
         </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-number">94%</div>
-          <div class="stat-label">Placement Rate</div>
-        </div>
-        <div class="stat-divider"></div>
-        <div class="stat-item">
-          <div class="stat-number">A+</div>
-          <div class="stat-label">NAAC Grade</div>
+        <div class="stat-strip-item">
+          <div class="stat-strip-value">94%</div>
+          <div class="stat-strip-label">Placement Rate</div>
         </div>
       </div>
-    </section>
+    </div>
 
     <!-- Announcements -->
-    <section class="landing-section" id="announcements">
+    <section class="landing-section landing-bg-alt">
       <div class="landing-section-inner">
         <div class="section-header">
-          <h2 class="section-title">📰 Latest Announcements</h2>
-          <p class="section-subtitle">Stay updated with important college notices</p>
+          <div class="section-tag">📢 Announcements</div>
+          <h2 class="section-title">Important Notices</h2>
+          <p class="section-subtitle">Stay updated with the latest from the college administration</p>
         </div>
         <div class="announcements-grid">
-          ${notices.map(n => `
-          <div class="announcement-card priority-${n.priority}">
-            <div class="announcement-header">
+          ${importantNotices.map(n => `
+          <div class="announcement-card ${n.priority}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
               <span class="badge badge-${n.priority === 'urgent' ? 'danger' : n.priority === 'high' ? 'warning' : 'info'}">${n.priority.toUpperCase()}</span>
-              <span class="badge badge-secondary">${n.category}</span>
+              <span class="text-xs text-muted">${formatDateShort(n.date)}</span>
             </div>
-            <h3 class="announcement-title">${n.title}</h3>
-            <p class="announcement-excerpt">${n.content.substring(0, 140)}…</p>
-            <div class="announcement-footer">
-              <span class="text-muted text-sm">📅 ${formatDate(n.date)}</span>
-              <span class="text-muted text-sm">— ${n.postedBy}</span>
-            </div>
-          </div>`).join('')}
+            <div style="font-weight:700;font-size:0.9375rem;color:var(--text-primary);margin-bottom:0.375rem;line-height:1.4">${escapeHtml(n.title)}</div>
+            <div style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.6;">${n.description.substring(0, 120)}...</div>
+            <div style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted);">Posted by: ${n.postedBy}</div>
+          </div>
+          `).join('')}
         </div>
       </div>
     </section>
 
-    <!-- Events -->
-    <section class="landing-section landing-section-alt" id="events-section">
+    <!-- Upcoming Events -->
+    <section class="landing-section">
       <div class="landing-section-inner">
         <div class="section-header">
-          <h2 class="section-title">🎉 Upcoming Events</h2>
-          <p class="section-subtitle">Don't miss out on the action</p>
+          <div class="section-tag">🎉 Events</div>
+          <h2 class="section-title">Upcoming Events</h2>
+          <p class="section-subtitle">Don't miss out on exciting academic and cultural activities</p>
         </div>
         <div class="events-grid-landing">
-          ${events.map(e => `
-          <div class="event-card-landing" style="--evt-color:${e.imageColor}">
-            <div class="event-card-banner" style="background:${e.imageColor}">
-              <span class="event-category-badge">${e.category}</span>
-              <div class="event-banner-emoji">${e.category === 'Hackathon' ? '💻' : e.category === 'Workshop' ? '🔧' : e.category === 'Tech Fest' ? '🚀' : e.category === 'Guest Lecture' ? '🎤' : e.category === 'Sports' ? '⚽' : '🎉'}</div>
+          ${upcoming.map(e => `
+          <div class="event-card-landing" onclick="navigate('login',{role:'student'})">
+            <div class="event-card-banner" style="background:linear-gradient(135deg,var(--primary-50),var(--primary-100))">
+              <span style="font-size:3.5rem;">${e.emoji}</span>
+              <span class="badge badge-primary" style="position:absolute;top:10px;right:10px;">${e.category}</span>
             </div>
             <div class="event-card-body">
-              <h3 class="event-card-title">${e.title}</h3>
               <div class="event-card-meta">
-                <span>📅 ${formatDate(e.date)}</span>
-                <span>📍 ${e.venue.split('&')[0].trim()}</span>
+                <span class="badge badge-success">${e.status}</span>
+                <span class="text-xs text-muted">${e.department}</span>
               </div>
-              <p class="event-card-desc">${e.description.substring(0, 100)}…</p>
-              <div class="event-card-footer">
-                <span class="text-sm text-muted">${e.registeredCount} registered</span>
-                <button class="btn btn-primary btn-sm" onclick="renderPage('login', {role:'student'})">Register</button>
+              <div class="event-card-title">${escapeHtml(e.title)}</div>
+              <div class="event-card-info">
+                📅 ${formatDateShort(e.date)} &nbsp;|&nbsp; 📍 ${e.venue}<br>
+                👥 ${e.registeredSeats}/${e.seats} registered &nbsp;|&nbsp; ⏰ ${e.startTime}
               </div>
+              <button class="btn btn-primary btn-sm btn-full">Register Now</button>
             </div>
-          </div>`).join('')}
+          </div>
+          `).join('')}
         </div>
       </div>
     </section>
 
     <!-- Features -->
-    <section class="landing-section" id="features">
+    <section class="landing-section landing-bg-alt">
       <div class="landing-section-inner">
         <div class="section-header">
-          <h2 class="section-title">✨ Platform Features</h2>
-          <p class="section-subtitle">Everything you need for a complete college experience</p>
+          <div class="section-tag">⚡ Features</div>
+          <h2 class="section-title">Everything in One Place</h2>
+          <p class="section-subtitle">A complete digital ecosystem for students, faculty, and administrators</p>
         </div>
         <div class="features-grid">
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">🤖</div>
-            <h3 class="feature-title">AI Campus Assistant</h3>
-            <p class="feature-desc">Get instant answers about your attendance, CGPA, timetable, and more through our intelligent AI chatbot.</p>
+            <div class="feature-icon" style="background:var(--primary-50);">🤖</div>
+            <div class="feature-title">AI Campus Assistant</div>
+            <div class="feature-desc">Intelligent AI-powered assistant that answers your questions and helps you navigate the portal in seconds.</div>
           </div>
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#10b981,#059669)">📊</div>
-            <h3 class="feature-title">Academic Performance</h3>
-            <p class="feature-desc">Track CGPA, SGPA, subject-wise marks, grade analysis with interactive charts and semester comparisons.</p>
+            <div class="feature-icon" style="background:var(--success-light);">📊</div>
+            <div class="feature-title">Academic Performance</div>
+            <div class="feature-desc">Track CGPA, SGPA, semester-wise results, and subject marks with beautiful charts and insights.</div>
           </div>
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📅</div>
-            <h3 class="feature-title">Attendance Tracking</h3>
-            <p class="feature-desc">Monitor attendance subject-wise with smart alerts for low attendance and auto-calculation of classes needed.</p>
+            <div class="feature-icon" style="background:var(--warning-light);">📅</div>
+            <div class="feature-title">Attendance Tracking</div>
+            <div class="feature-desc">Monitor subject-wise attendance with smart alerts when you're below the required percentage.</div>
           </div>
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">⏰</div>
-            <h3 class="feature-title">Smart Timetable</h3>
-            <p class="feature-desc">View your weekly class schedule with today's classes highlighted, room numbers, and faculty details.</p>
+            <div class="feature-icon" style="background:var(--info-light);">⏰</div>
+            <div class="feature-title">Smart Timetable</div>
+            <div class="feature-desc">Interactive weekly timetable with current class highlight, subject details, and room information.</div>
           </div>
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">🏢</div>
-            <h3 class="feature-title">Campus Services</h3>
-            <p class="feature-desc">Apply for bonafide certificates, library extensions, ID cards, and track application status online.</p>
+            <div class="feature-icon" style="background:var(--purple-light);">🏢</div>
+            <div class="feature-title">Campus Services</div>
+            <div class="feature-desc">Apply for certificates, leaves, library access, and track all your applications in one place.</div>
           </div>
           <div class="feature-card">
-            <div class="feature-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626)">📰</div>
-            <h3 class="feature-title">Notice Board</h3>
-            <p class="feature-desc">Stay updated with important announcements, exam schedules, holidays, and college news in real-time.</p>
+            <div class="feature-icon" style="background:var(--teal-light);">🎉</div>
+            <div class="feature-title">Events & Clubs</div>
+            <div class="feature-desc">Discover and register for events, join clubs, and never miss exciting campus activities.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Login Quick Access -->
+    <section class="landing-section">
+      <div class="landing-section-inner">
+        <div class="section-header">
+          <div class="section-tag">🚀 Get Started</div>
+          <h2 class="section-title">Login to Your Portal</h2>
+          <p class="section-subtitle">Choose your role to access your personalized dashboard</p>
+        </div>
+        <div class="grid-3" style="max-width:800px;margin:0 auto;">
+          <div class="feature-card" style="text-align:center;cursor:pointer;" onclick="navigate('login',{role:'student'})">
+            <div style="font-size:3rem;margin-bottom:1rem;">🎓</div>
+            <div class="feature-title">Student Portal</div>
+            <div class="feature-desc" style="margin-bottom:1rem;">Access academics, attendance, events, and campus services</div>
+            <button class="btn btn-primary btn-sm">Student Login</button>
+          </div>
+          <div class="feature-card" style="text-align:center;cursor:pointer;" onclick="navigate('login',{role:'faculty'})">
+            <div style="font-size:3rem;margin-bottom:1rem;">👨‍🏫</div>
+            <div class="feature-title">Faculty Portal</div>
+            <div class="feature-desc" style="margin-bottom:1rem;">Manage attendance, assignments, marks, and student progress</div>
+            <button class="btn btn-success btn-sm">Faculty Login</button>
+          </div>
+          <div class="feature-card" style="text-align:center;cursor:pointer;" onclick="navigate('login',{role:'admin'})">
+            <div style="font-size:3rem;margin-bottom:1rem;">🔑</div>
+            <div class="feature-title">Admin Portal</div>
+            <div class="feature-desc" style="margin-bottom:1rem;">Manage college operations, reports, and overall administration</div>
+            <button class="btn btn-secondary btn-sm" style="background:var(--purple);color:white;border-color:var(--purple);">Admin Login</button>
           </div>
         </div>
       </div>
     </section>
 
     <!-- Footer -->
-    <footer class="landing-footer" id="footer">
+    <footer class="landing-footer">
       <div class="footer-inner">
-        <div class="footer-brand">
-          <div class="footer-logo">🎓 CampusConnect</div>
-          <p class="footer-tagline">${college.name}</p>
-          <p class="text-sm">${college.tagline}</p>
+        <div class="footer-grid">
+          <div>
+            <div class="footer-brand">🎓 CampusConnect</div>
+            <div class="footer-desc">${APP_DATA.college.name}, ${APP_DATA.college.address}</div>
+            <div style="font-size:0.875rem;">📞 ${APP_DATA.college.phone} &nbsp; ✉️ ${APP_DATA.college.email}</div>
+          </div>
+          <div>
+            <div class="footer-col-title">Students</div>
+            <div class="footer-links">
+              <a href="#">Academics</a><a href="#">Attendance</a>
+              <a href="#">Events</a><a href="#">Campus Services</a>
+            </div>
+          </div>
+          <div>
+            <div class="footer-col-title">Faculty</div>
+            <div class="footer-links">
+              <a href="#">Attendance</a><a href="#">Assignments</a>
+              <a href="#">Marks Entry</a><a href="#">Leave Requests</a>
+            </div>
+          </div>
+          <div>
+            <div class="footer-col-title">About</div>
+            <div class="footer-links">
+              <a href="#">NAAC A+ Accredited</a>
+              <a href="#">Est. ${APP_DATA.college.established}</a>
+              <a href="#">Placements</a><a href="#">Contact</a>
+            </div>
+          </div>
         </div>
-        <div class="footer-links">
-          <h4>Quick Links</h4>
-          <a href="#" onclick="renderPage('login',{role:'student'}); return false;">Student Portal</a>
-          <a href="#" onclick="renderPage('login',{role:'faculty'}); return false;">Faculty Portal</a>
-          <a href="#" onclick="renderPage('login',{role:'admin'}); return false;">Admin Panel</a>
-          <a href="#events-section">Events</a>
-          <a href="#announcements">Notices</a>
+        <div class="footer-bottom">
+          © 2026 ${APP_DATA.college.name}. Built with ❤️ – CampusConnect Smart Portal. For academic demo purposes.
         </div>
-        <div class="footer-links">
-          <h4>Academics</h4>
-          <a href="#">Departments</a>
-          <a href="#">Examination Cell</a>
-          <a href="#">Library</a>
-          <a href="#">Placement Cell</a>
-          <a href="#">Research</a>
-        </div>
-        <div class="footer-contact">
-          <h4>Contact</h4>
-          <p>📍 ${college.address}</p>
-          <p>📞 ${college.phone}</p>
-          <p>✉️ ${college.email}</p>
-          <p>🌐 ${college.website}</p>
-        </div>
-      </div>
-      <div class="footer-bottom">
-        <p>© ${new Date().getFullYear()} ${college.name}. All rights reserved.</p>
-        <p>Established ${college.established} • Affiliated to ${college.affiliation}</p>
       </div>
     </footer>
   </div>`;
 }
 
-function toggleLoginDropdown() {
-  const d = document.getElementById('login-dropdown');
-  if (d) d.classList.toggle('visible');
-  document.addEventListener('click', function closeDD(e) {
-    if (!e.target.closest('.login-dropdown-wrapper')) {
-      if (d) d.classList.remove('visible');
-      document.removeEventListener('click', closeDD);
-    }
-  });
+function initLanding() {
+  // nothing specific
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // LOGIN PAGE
-// ─────────────────────────────────────────────────────────────
-function renderLogin(role = 'student') {
-  const demos = {
-    student: { id: 'STU1001', pass: 'student123', label: 'Student', icon: '👨‍🎓' },
-    faculty:  { id: 'FAC001',  pass: 'faculty123', label: 'Faculty', icon: '👨‍🏫' },
-    admin:    { id: 'ADMIN001',pass: 'admin123',   label: 'Admin',   icon: '🛡️' },
+// ============================================================
+function renderLogin(role) {
+  const roleData = {
+    student: { label: 'Student', id: 'STU1001', pass: 'student123', color: 'primary', icon: '🎓' },
+    faculty: { label: 'Faculty', id: 'FAC001', pass: 'faculty123', color: 'teal', icon: '👨‍🏫' },
+    admin: { label: 'Admin', id: 'ADMIN001', pass: 'admin123', color: 'purple', icon: '🔑' }
   };
-  const d = demos[role] || demos.student;
+  const r = roleData[role] || roleData.student;
 
   return `
-  <div class="login-page">
+  <div class="login-page" style="background:var(--bg-secondary);">
     <div class="login-card">
-      <div class="login-sidebar">
-        <div class="login-sidebar-content">
-          <div class="login-logo">🎓</div>
-          <h2 class="login-brand">CampusConnect</h2>
-          <p class="login-brand-sub">Vishwakarma Institute of Technology, Pune</p>
-          <div class="login-features">
-            <div class="login-feature"><span>✅</span> Unified Academic Portal</div>
-            <div class="login-feature"><span>✅</span> Real-time Notifications</div>
-            <div class="login-feature"><span>✅</span> AI Campus Assistant</div>
-            <div class="login-feature"><span>✅</span> Mobile Responsive</div>
-          </div>
-        </div>
+      <div class="login-header">
+        <div class="login-logo">🎓</div>
+        <div class="login-title">CampusConnect</div>
+        <div class="login-subtitle">Smart College Management Portal</div>
       </div>
-      <div class="login-form-area">
-        <button class="btn btn-ghost back-btn" onclick="renderPage('landing')">← Back to Home</button>
-        <h2 class="login-title">Welcome Back!</h2>
-        <p class="login-subtitle">Sign in to your ${d.label} account</p>
-
-        <!-- Role Tabs -->
+      <div class="login-body">
         <div class="role-tabs">
-          <button class="role-tab ${role === 'student' ? 'active' : ''}" onclick="renderPage('login',{role:'student'})">👨‍🎓 Student</button>
-          <button class="role-tab ${role === 'faculty' ? 'active' : ''}" onclick="renderPage('login',{role:'faculty'})">👨‍🏫 Faculty</button>
-          <button class="role-tab ${role === 'admin'   ? 'active' : ''}" onclick="renderPage('login',{role:'admin'})">🛡️ Admin</button>
+          <button class="role-tab ${role === 'student' ? 'active' : ''}" onclick="navigate('login',{role:'student'})">🎓 Student</button>
+          <button class="role-tab ${role === 'faculty' ? 'active' : ''}" onclick="navigate('login',{role:'faculty'})">👨‍🏫 Faculty</button>
+          <button class="role-tab ${role === 'admin' ? 'active' : ''}" onclick="navigate('login',{role:'admin'})">🔑 Admin</button>
         </div>
 
-        <!-- Demo Credentials -->
         <div class="demo-credentials">
-          <div class="demo-label">🔑 Demo Credentials</div>
-          <div class="demo-row">
-            <span>${d.icon} ID:</span><strong>${d.id}</strong>
-            <button class="btn-ghost-sm" onclick="document.getElementById('login-id').value='${d.id}'">Use</button>
-          </div>
-          <div class="demo-row">
-            <span>🔒 Pass:</span><strong>${d.pass}</strong>
-            <button class="btn-ghost-sm" onclick="document.getElementById('login-pass').value='${d.pass}'">Use</button>
-          </div>
+          <p><strong>🔑 Demo Credentials (${r.label})</strong></p>
+          <p>ID: <strong>${r.id}</strong></p>
+          <p>Password: <strong>${r.pass}</strong></p>
         </div>
 
-        <!-- Form -->
-        <form class="login-form" onsubmit="handleLoginSubmit(event)">
-          <div class="form-group">
-            <label class="form-label">${role === 'student' ? 'Student ID' : role === 'faculty' ? 'Employee ID' : 'Admin ID'}</label>
-            <input type="text" id="login-id" class="form-input" placeholder="${d.id}" autocomplete="username" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Password</label>
-            <div class="password-input-wrapper">
-              <input type="password" id="login-pass" class="form-input" placeholder="Enter your password" autocomplete="current-password" required>
-              <button type="button" class="password-toggle" onclick="togglePasswordVisibility()">👁️</button>
-            </div>
-          </div>
-          <div class="form-options">
-            <label class="checkbox-label">
-              <input type="checkbox" id="remember-me"> Remember me
-            </label>
-            <a href="#" class="forgot-link">Forgot Password?</a>
-          </div>
-          <button type="submit" class="btn btn-primary btn-full login-btn">
-            Sign In →
-          </button>
-        </form>
+        <div id="login-error" class="form-error" style="display:none;margin-bottom:0.75rem;padding:0.625rem;background:var(--danger-light);border-radius:var(--radius-sm);"></div>
 
-        <p class="login-footer-text">
-          By signing in, you agree to VIT's <a href="#">Terms of Use</a> and <a href="#">Privacy Policy</a>.
-        </p>
+        <div class="form-group">
+          <label class="form-label">Employee / Student ID</label>
+          <input type="text" id="login-id" class="form-input" value="${r.id}" placeholder="Enter your ID (e.g. ${r.id})" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="login-pass" class="form-input" value="${r.pass}" placeholder="Enter your password" autocomplete="current-password"
+            onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+
+        <button class="btn btn-primary btn-full btn-lg" onclick="doLogin()">
+          Login to Portal
+        </button>
+
+        <div style="text-align:center;margin-top:1.25rem;">
+          <a href="#" onclick="navigate('landing');return false;" style="font-size:0.875rem;color:var(--text-secondary);">
+            ← Back to Home
+          </a>
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-function handleLoginSubmit(e) {
-  e.preventDefault();
-  const id = document.getElementById('login-id').value.trim();
+function doLogin() {
+  const id = document.getElementById('login-id').value;
   const pass = document.getElementById('login-pass').value;
+  if (!id || !pass) { showToast('Please enter your ID and password.', 'warning'); return; }
   login(id, pass);
 }
 
-function togglePasswordVisibility() {
-  const input = document.getElementById('login-pass');
-  const btn = document.querySelector('.password-toggle');
-  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
-  else { input.type = 'password'; btn.textContent = '👁️'; }
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDENT DASHBOARD
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentDashboard() {
   const user = APP_STATE.currentUser;
-  const student = APP_DATA.students.find(s => s.id === user.id) || {};
   const att = APP_DATA.attendance[user.id] || { overall: 0, subjects: [] };
   const results = APP_DATA.semesterResults[user.id] || [];
   const cgpa = calculateCGPA(results);
-  const pendingAssignments = APP_DATA.assignments.filter(a => a.studentId === user.id && a.status === 'pending');
-  const upcomingExams = APP_DATA.upcomingExams || [];
-  const todayClasses = APP_DATA.timetable[user.id]?.Monday || [];
-  const recentAssignments = APP_DATA.assignments.filter(a => a.studentId === user.id).slice(0, 3);
+  const pending = APP_DATA.assignments.filter(a => {
+    const s = a.studentStatus[user.id];
+    return s === 'pending' || s === undefined;
+  });
+  const todayDay = getDayName();
+  const tt = APP_DATA.timetable[user.id];
+  const todayClasses = (tt && tt[todayDay]) || (tt && tt['Monday']) || [];
   const upcomingEvents = APP_DATA.events.filter(e => e.status === 'upcoming').slice(0, 3);
   const recentNotices = APP_DATA.notices.slice(0, 3);
 
   return `
-  <div class="page-content">
+  <div>
     <!-- Welcome Banner -->
     <div class="welcome-banner">
-      <div class="welcome-text">
-        <h1 class="welcome-heading">${getGreeting()}, ${user.name.split(' ')[0]}! 👋</h1>
-        <p class="welcome-subtitle">Here's what's happening on campus today.</p>
-      </div>
-      <div class="welcome-info-card">
-        <div class="info-chip">🆔 ${user.id}</div>
-        <div class="info-chip">🏛️ ${user.department}</div>
-        <div class="info-chip">📚 Sem ${user.semester}</div>
-        <div class="info-chip">🏷️ Sec ${student.section || 'A'}</div>
-      </div>
-    </div>
-
-    <!-- Stats Row -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">📊</div>
-        <div class="stat-card-body">
-          <div class="stat-card-value">${cgpa}</div>
-          <div class="stat-card-label">Current CGPA</div>
+      <div class="welcome-content">
+        <div>
+          <div class="welcome-title">${getGreeting()}, ${user.name.split(' ')[0]}! 👋</div>
+          <div class="welcome-subtitle">${user.department} | Semester ${user.semester} | Section ${user.section} | ID: ${user.id}</div>
         </div>
-        <div class="stat-card-trend trend-up">↑ Semester 4</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,${att.overall >= 85 ? '#10b981,#059669' : att.overall >= 75 ? '#f59e0b,#d97706' : '#ef4444,#dc2626'})">📅</div>
-        <div class="stat-card-body">
-          <div class="stat-card-value">${att.overall}%</div>
-          <div class="stat-card-label">Overall Attendance</div>
+        <div class="welcome-stats">
+          <div class="welcome-stat">
+            <div class="welcome-stat-value">${cgpa}</div>
+            <div class="welcome-stat-label">CGPA</div>
+          </div>
+          <div class="welcome-stat">
+            <div class="welcome-stat-value">${att.overall}%</div>
+            <div class="welcome-stat-label">Attendance</div>
+          </div>
+          <div class="welcome-stat">
+            <div class="welcome-stat-value">${pending.length}</div>
+            <div class="welcome-stat-label">Pending Tasks</div>
+          </div>
         </div>
-        <div class="stat-card-trend ${att.overall >= 75 ? 'trend-up' : 'trend-down'}">${att.overall >= 75 ? '✓ Safe' : '⚠ Warning'}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📝</div>
-        <div class="stat-card-body">
-          <div class="stat-card-value">${pendingAssignments.length}</div>
-          <div class="stat-card-label">Pending Assignments</div>
-        </div>
-        <div class="stat-card-trend ${pendingAssignments.length > 0 ? 'trend-warn' : 'trend-up'}">${pendingAssignments.length > 0 ? '⚠ Action needed' : '✓ All done'}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">📚</div>
-        <div class="stat-card-body">
-          <div class="stat-card-value">${upcomingExams.length}</div>
-          <div class="stat-card-label">Upcoming Exams</div>
-        </div>
-        <div class="stat-card-trend trend-warn">📅 Oct 21-23</div>
       </div>
     </div>
 
     <!-- Quick Actions -->
-    <div class="section-card">
-      <h2 class="section-card-title">⚡ Quick Actions</h2>
+    <div class="section-mb">
+      <div class="page-header-row mb-4">
+        <h2 class="page-title" style="font-size:1rem;margin:0;">Quick Actions</h2>
+      </div>
       <div class="quick-actions-grid">
-        <button class="quick-action" onclick="navigate('student-attendance')">
-          <span class="qa-icon">📅</span>
-          <span class="qa-label">Attendance</span>
-          <span class="badge badge-${att.overall >= 75 ? 'success' : 'danger'}">${att.overall}%</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-cgpa')">
-          <span class="qa-icon">📊</span>
-          <span class="qa-label">CGPA</span>
-          <span class="badge badge-primary">${cgpa}</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-timetable')">
-          <span class="qa-icon">⏰</span>
-          <span class="qa-label">Timetable</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-assignments')">
-          <span class="qa-icon">📝</span>
-          <span class="qa-label">Assignments</span>
-          ${pendingAssignments.length > 0 ? `<span class="badge badge-warning">${pendingAssignments.length} pending</span>` : ''}
-        </button>
-        <button class="quick-action" onclick="navigate('student-exams')">
-          <span class="qa-icon">📚</span>
-          <span class="qa-label">Exams</span>
-          <span class="badge badge-info">${upcomingExams.length}</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-leave')">
-          <span class="qa-icon">📋</span>
-          <span class="qa-label">Apply Leave</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-events')">
-          <span class="qa-icon">🎉</span>
-          <span class="qa-label">Events</span>
-        </button>
-        <button class="quick-action" onclick="navigate('student-notices')">
-          <span class="qa-icon">📰</span>
-          <span class="qa-label">Notices</span>
-        </button>
+        ${[
+          { icon:'📅', label:'Attendance', page:'student-attendance', color:'var(--info-light)', badge: att.subjects.filter(s=>s.percentage<75).length || null },
+          { icon:'📊', label:'My CGPA', page:'student-cgpa', color:'var(--primary-50)' },
+          { icon:'⏰', label:"Today's Timetable", page:'student-timetable', color:'var(--success-light)' },
+          { icon:'📝', label:'Assignments', page:'student-assignments', color:'var(--warning-light)', badge: pending.length || null },
+          { icon:'📚', label:'Upcoming Exams', page:'student-exams', color:'var(--danger-light)' },
+          { icon:'📋', label:'Apply Leave', page:'student-leave', color:'var(--purple-light)' },
+          { icon:'🎉', label:'College Events', page:'student-events', color:'var(--teal-light)' },
+          { icon:'📢', label:'Notices', page:'student-notices', color:'var(--primary-50)' },
+        ].map(qa => `
+          <div class="quick-action-card" onclick="navigate('${qa.page}')">
+            <div class="quick-action-icon" style="background:${qa.color}">
+              ${qa.icon}
+              ${qa.badge ? `<span class="quick-action-badge">${qa.badge}</span>` : ''}
+            </div>
+            <div class="quick-action-label">${qa.label}</div>
+          </div>
+        `).join('')}
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <!-- Today's Timetable -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">⏰ Today's Classes</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('student-timetable')">View Full →</button>
+    <!-- Stats -->
+    <div class="stats-grid section-mb">
+      <div class="stat-card">
+        <div class="stat-card-icon primary">📊</div>
+        <div>
+          <div class="stat-card-value">${cgpa}</div>
+          <div class="stat-card-label">Current CGPA</div>
+          <div class="stat-card-change positive">↑ /10.0</div>
         </div>
-        <div class="today-classes">
-          ${todayClasses.length === 0 ? '<p class="empty-state">No classes today 🎉</p>' :
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon ${att.overall >= 75 ? 'success' : 'danger'}">📅</div>
+        <div>
+          <div class="stat-card-value">${att.overall}%</div>
+          <div class="stat-card-label">Overall Attendance</div>
+          <div class="stat-card-change ${att.overall >= 75 ? 'positive' : 'negative'}">${att.overall >= 75 ? '✓ Above minimum' : '⚠ Below 75%'}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon warning">📝</div>
+        <div>
+          <div class="stat-card-value">${pending.length}</div>
+          <div class="stat-card-label">Pending Assignments</div>
+          <div class="stat-card-change negative">${pending.length > 0 ? 'Due this month' : 'All done!'}</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-icon danger">📚</div>
+        <div>
+          <div class="stat-card-value">${APP_DATA.upcomingExams.length}</div>
+          <div class="stat-card-label">Upcoming Exams</div>
+          <div class="stat-card-change negative">Oct 20–23, 2026</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Today's Timetable + Attendance Chart -->
+    <div class="two-col-layout section-mb">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">⏰ Today's Classes (${todayDay})</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('student-timetable')">View All →</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          ${todayClasses.length === 0 ? `<div class="empty-state" style="padding:2rem;"><div class="empty-state-icon">🎉</div><div class="empty-state-title">No Classes Today!</div><div class="empty-state-desc">Enjoy your free day.</div></div>` :
             todayClasses.map(c => `
-            <div class="today-class type-${c.type}">
-              <div class="class-time">${c.time}</div>
-              <div class="class-info">
-                <div class="class-subject">${c.subject}</div>
-                <div class="class-meta">${c.professor} • ${c.room}</div>
+            <div style="display:flex;align-items:center;gap:0.875rem;padding:0.875rem 1.25rem;border-bottom:1px solid var(--border-light);">
+              <div style="min-width:80px;font-size:0.75rem;color:var(--text-muted);font-weight:600;">${c.time}</div>
+              <div style="width:3px;height:40px;border-radius:99px;background:${c.type==='Lab'?'var(--teal)':c.type==='Project'?'var(--accent)':'var(--primary)'}"></div>
+              <div style="flex:1;">
+                <div style="font-weight:700;font-size:0.875rem;color:var(--text-primary);">${c.subject}</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);">${c.professor} · ${c.room}</div>
               </div>
-              <span class="class-type-badge">${c.type}</span>
-            </div>`).join('')}
+              <span class="badge badge-${c.type==='Lab'?'teal':c.type==='Project'?'warning':'primary'}">${c.type}</span>
+            </div>
+          `).join('')}
         </div>
       </div>
 
-      <!-- Recent Assignments -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">📝 Recent Assignments</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('student-assignments')">View All →</button>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📅 Attendance Summary</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('student-attendance')">Details →</button>
         </div>
-        <div class="assignment-list">
-          ${recentAssignments.map(a => `
-          <div class="assignment-item">
-            <div class="assignment-item-info">
-              <div class="assignment-item-title">${a.title}</div>
-              <div class="assignment-item-sub">${a.subject} • ${a.faculty}</div>
-              <div class="assignment-item-due">Due: ${formatDate(a.dueDate)}</div>
-            </div>
-            <span class="badge badge-${getStatusColor(a.status)}">${a.status}</span>
-          </div>`).join('')}
-        </div>
-      </div>
-
-      <!-- Upcoming Events -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">🎉 Upcoming Events</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('student-events')">View All →</button>
-        </div>
-        <div class="event-list">
-          ${upcomingEvents.map(e => `
-          <div class="event-item">
-            <div class="event-item-dot" style="background:${e.imageColor}"></div>
-            <div class="event-item-info">
-              <div class="event-item-title">${e.title}</div>
-              <div class="event-item-sub">📅 ${formatDate(e.date)} • 📍 ${e.venue.split('&')[0]}</div>
-            </div>
-            <span class="badge badge-${e.isRegistered ? 'success' : 'secondary'}">${e.isRegistered ? 'Registered' : 'Open'}</span>
-          </div>`).join('')}
-        </div>
-      </div>
-
-      <!-- Recent Notices -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">📰 Recent Notices</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('student-notices')">View All →</button>
-        </div>
-        <div class="notice-list">
-          ${recentNotices.map(n => `
-          <div class="notice-item ${!n.isRead ? 'unread' : ''}">
-            <div class="notice-item-info">
-              <div class="notice-item-title">${n.title}</div>
-              <div class="notice-item-sub">${n.postedBy} • ${formatDate(n.date)}</div>
-            </div>
-            <span class="badge badge-${n.priority === 'urgent' ? 'danger' : n.priority === 'high' ? 'warning' : 'info'}">${n.priority}</span>
-          </div>`).join('')}
+        <div class="card-body" style="padding:1rem;">
+          ${att.subjects.map(s => {
+            const status = getAttendanceStatus(s.percentage, att.minRequired);
+            const color = status === 'safe' ? 'success' : status === 'warning' ? 'warning' : 'danger';
+            return `
+            <div style="margin-bottom:0.875rem;">
+              <div style="display:flex;justify-content:space-between;font-size:0.8125rem;margin-bottom:0.25rem;">
+                <span style="font-weight:600;color:var(--text-primary);">${s.name}</span>
+                <span class="badge badge-${color}">${s.percentage}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill ${color}" style="width:${s.percentage}%;"></div>
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>
     </div>
 
-    <!-- Attendance Chart -->
-    <div class="section-card">
-      <h2 class="section-card-title">📅 Attendance Overview</h2>
-      <div class="attendance-bars">
-        ${att.subjects.map(s => `
-        <div class="att-bar-row">
-          <div class="att-bar-label">
-            <span class="att-subject">${s.name}</span>
-            <span class="att-code">${s.code}</span>
-          </div>
-          <div class="att-bar-track">
-            <div class="att-bar-fill" style="width:${s.percentage}%;background:${s.percentage >= 85 ? '#10b981' : s.percentage >= 75 ? '#f59e0b' : '#ef4444'}"></div>
-          </div>
-          <span class="att-pct ${s.percentage >= 85 ? 'text-success' : s.percentage >= 75 ? 'text-warning' : 'text-danger'}">${s.percentage}%</span>
-        </div>`).join('')}
+    <!-- Pending Assignments -->
+    <div class="card section-mb">
+      <div class="card-header">
+        <div class="card-title">📝 Pending Assignments</div>
+        <button class="btn btn-ghost btn-sm" onclick="navigate('student-assignments')">View All →</button>
+      </div>
+      <div class="card-body" style="padding:0;">
+        ${pending.length === 0 ? `<div class="empty-state" style="padding:2rem;"><div class="empty-state-icon">✅</div><div class="empty-state-title">All assignments submitted!</div></div>` :
+          pending.slice(0,3).map(a => {
+            const days = getDaysUntil(a.dueDate);
+            const urgent = days <= 3;
+            return `
+            <div style="display:flex;align-items:center;gap:1rem;padding:0.875rem 1.25rem;border-bottom:1px solid var(--border-light);">
+              <div style="width:3px;height:48px;border-radius:99px;background:${urgent?'var(--danger)':days<=7?'var(--warning)':'var(--primary)'}"></div>
+              <div style="flex:1;">
+                <div style="font-weight:700;font-size:0.875rem;">${a.title}</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);">${a.subject} · ${a.faculty}</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge badge-${urgent?'danger':days<=7?'warning':'secondary'}">${days <= 0 ? 'Overdue' : days + ' days'}</span>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.125rem;">Due: ${formatDateShort(a.dueDate)}</div>
+              </div>
+            </div>`;
+          }).join('')}
+      </div>
+    </div>
+
+    <!-- Events + Notices Row -->
+    <div class="two-col-layout">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🎉 Upcoming Events</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('student-events')">All Events →</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          ${upcomingEvents.map(e => `
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1.25rem;border-bottom:1px solid var(--border-light);cursor:pointer;" onclick="navigate('student-events')">
+            <div style="font-size:1.5rem;">${e.emoji}</div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:0.875rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${e.title}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">${formatDateShort(e.date)}</div>
+            </div>
+            ${e.registered.includes(user.id) ? '<span class="badge badge-success">Registered</span>' : '<span class="badge badge-secondary">Register</span>'}
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📢 Recent Notices</div>
+          <button class="btn btn-ghost btn-sm" onclick="navigate('student-notices')">All Notices →</button>
+        </div>
+        <div class="card-body" style="padding:0;">
+          ${recentNotices.map(n => `
+          <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border-light);cursor:pointer;" onclick="navigate('student-notices')">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+              <div class="priority-dot ${n.priority}"></div>
+              <span class="badge badge-${n.priority==='urgent'?'danger':n.priority==='high'?'warning':'secondary'}" style="font-size:0.625rem;">${n.category}</span>
+              <span style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;">${formatDateShort(n.date)}</span>
+            </div>
+            <div style="font-weight:600;font-size:0.875rem;line-height:1.4;">${n.title}</div>
+          </div>`).join('')}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDENT ATTENDANCE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentAttendance() {
   const user = APP_STATE.currentUser;
   const att = APP_DATA.attendance[user.id] || { overall: 0, minRequired: 75, subjects: [] };
-
-  const overallColor = att.overall >= 85 ? '#10b981' : att.overall >= 75 ? '#f59e0b' : '#ef4444';
-  const overallStatus = att.overall >= (att.minRequired + 10) ? 'Safe' : att.overall >= att.minRequired ? 'Warning' : 'Critical';
+  const overallStatus = getAttendanceStatus(att.overall, att.minRequired);
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📅 My Attendance</h1>
-      <p class="page-subtitle">Semester 5 – Academic Year 2024-25</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📅 Attendance</div>
+        <div class="page-subtitle">Academic Year 2026-27 | Semester ${user.semester}</div>
+      </div>
     </div>
 
-    <!-- Overall Card -->
-    <div class="overall-att-card" style="border-left:4px solid ${overallColor}">
-      <div class="overall-att-circle" style="--pct:${att.overall};--color:${overallColor}">
-        <div class="overall-att-inner">
-          <div class="overall-att-pct">${att.overall}%</div>
-          <div class="overall-att-lbl">Overall</div>
+    <!-- Overall Summary -->
+    <div class="card section-mb" style="background:linear-gradient(135deg,${overallStatus==='safe'?'var(--success-light),#f0fdf4':'overallStatus==="warning"?'var(--warning-light),#fffbeb':'var(--danger-light),#fef2f2'});border-color:${overallStatus==='safe'?'var(--success)':overallStatus==='warning'?'var(--warning)':'var(--danger)'};">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap;">
+          <div style="text-align:center;">
+            <div style="font-size:3.5rem;font-weight:800;color:${overallStatus==='safe'?'var(--success)':overallStatus==='warning'?'var(--warning)':'var(--danger)'};">${att.overall}%</div>
+            <div style="font-size:0.875rem;color:var(--text-secondary);font-weight:600;">Overall Attendance</div>
+          </div>
+          <div style="flex:1;">
+            <div class="progress-bar" style="height:12px;margin-bottom:0.75rem;">
+              <div class="progress-fill ${overallStatus}" style="width:${att.overall}%;height:12px;"></div>
+            </div>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;">
+              <div><span style="font-size:1.25rem;font-weight:700;">${att.subjects.reduce((s,sub)=>s+sub.present,0)}</span><br><span style="font-size:0.75rem;color:var(--text-muted);">Classes Attended</span></div>
+              <div><span style="font-size:1.25rem;font-weight:700;">${att.subjects.reduce((s,sub)=>s+sub.total,0)}</span><br><span style="font-size:0.75rem;color:var(--text-muted);">Total Classes</span></div>
+              <div><span style="font-size:1.25rem;font-weight:700;">${att.subjects.reduce((s,sub)=>s+(sub.total-sub.present),0)}</span><br><span style="font-size:0.75rem;color:var(--text-muted);">Classes Missed</span></div>
+              <div><span style="font-size:1.25rem;font-weight:700;color:${overallStatus==='safe'?'var(--success)':'var(--danger)'};">${getStatusLabel(overallStatus)}</span><br><span style="font-size:0.75rem;color:var(--text-muted);">Status (Min ${att.minRequired}%)</span></div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="overall-att-info">
-        <h2 class="overall-att-title">Overall Attendance: <span style="color:${overallColor}">${att.overall}%</span></h2>
-        <p class="overall-att-sub">Minimum required: <strong>${att.minRequired}%</strong></p>
-        <span class="badge badge-${att.overall >= 85 ? 'success' : att.overall >= 75 ? 'warning' : 'danger'} badge-lg">Status: ${overallStatus}</span>
-        ${att.overall < att.minRequired ? `<p class="text-danger mt-2">⚠️ Your attendance is below the minimum required threshold. Attend all upcoming classes.</p>` : `<p class="text-success mt-2">✅ You are maintaining safe attendance levels.</p>`}
-      </div>
     </div>
 
-    <!-- Minimum Attendance Note -->
-    <div class="info-box">
-      <span>ℹ️</span>
-      <p>Students with attendance below <strong>${att.minRequired}%</strong> may be debarred from the End Semester Examination. Condonation up to 5% may be granted on medical/emergency grounds with valid documentation.</p>
-    </div>
-
-    <!-- Subject Cards -->
-    <h2 class="section-heading">Subject-wise Attendance</h2>
-    <div class="subject-att-grid">
+    <!-- Subject-wise Attendance -->
+    <div style="display:grid;gap:1rem;">
       ${att.subjects.map(s => {
-        const color = s.percentage >= 85 ? '#10b981' : s.percentage >= 75 ? '#f59e0b' : '#ef4444';
-        const statusLabel = s.percentage >= (att.minRequired + 10) ? 'Safe' : s.percentage >= att.minRequired ? 'Warning' : 'Critical';
+        const status = getAttendanceStatus(s.percentage, att.minRequired);
         const needed = classesNeeded(s.present, s.total, att.minRequired);
-        const canMiss = s.percentage >= att.minRequired ? Math.floor((s.present - att.minRequired/100 * s.total) / (1 - att.minRequired/100)) : 0;
+        const color = status === 'safe' ? 'var(--success)' : status === 'warning' ? 'var(--warning)' : 'var(--danger)';
         return `
-        <div class="subject-att-card" style="border-top:3px solid ${color}">
-          <div class="subject-att-header">
+        <div class="attendance-subject-card ${status}">
+          <div class="attendance-subject-header">
             <div>
-              <div class="subject-att-name">${s.name}</div>
-              <div class="subject-att-code">${s.code}</div>
+              <div style="font-weight:700;font-size:0.9375rem;">${s.name}</div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);">${s.code} · Faculty: ${s.faculty}</div>
             </div>
-            <span class="badge badge-${s.percentage >= 85 ? 'success' : s.percentage >= 75 ? 'warning' : 'danger'}">${statusLabel}</span>
+            <span class="badge badge-${status === 'safe' ? 'success' : status === 'warning' ? 'warning' : 'danger'}">${getStatusLabel(status)}</span>
           </div>
-          <div class="att-progress-track">
-            <div class="att-progress-fill" style="width:${s.percentage}%;background:${color}"></div>
-            <div class="att-min-marker" style="left:${att.minRequired}%"></div>
+          <div style="margin-bottom:0.5rem;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.375rem;">
+              <span style="font-size:0.8125rem;color:var(--text-secondary);">Attendance Progress</span>
+              <span style="font-size:0.9375rem;font-weight:800;color:${color};">${s.percentage}%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill ${status}" style="width:${s.percentage}%;"></div>
+            </div>
           </div>
-          <div class="subject-att-stats">
-            <div class="att-stat"><span class="att-stat-val text-success">${s.present}</span><span class="att-stat-lbl">Present</span></div>
-            <div class="att-stat"><span class="att-stat-val text-danger">${s.total - s.present}</span><span class="att-stat-lbl">Absent</span></div>
-            <div class="att-stat"><span class="att-stat-val">${s.total}</span><span class="att-stat-lbl">Total</span></div>
-            <div class="att-stat"><span class="att-stat-val" style="color:${color}">${s.percentage}%</span><span class="att-stat-lbl">Percentage</span></div>
+          <div class="attendance-meta">
+            <div class="att-meta-item">
+              <div class="att-meta-value" style="color:var(--success);">${s.present}</div>
+              <div class="att-meta-label">Present</div>
+            </div>
+            <div class="att-meta-item">
+              <div class="att-meta-value" style="color:var(--danger);">${s.total - s.present}</div>
+              <div class="att-meta-label">Absent</div>
+            </div>
+            <div class="att-meta-item">
+              <div class="att-meta-value">${s.total}</div>
+              <div class="att-meta-label">Total</div>
+            </div>
           </div>
-          ${needed > 0 ? `<div class="att-warning-msg">⚠️ Attend <strong>${needed} more classes</strong> to reach the minimum ${att.minRequired}% threshold.</div>` :
-            canMiss > 0 ? `<div class="att-safe-msg">✅ You can afford to miss <strong>${canMiss} more class(es)</strong> while staying above ${att.minRequired}%.</div>` : ''}
+          ${needed > 0 ? `<div style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:var(--danger-light);border-radius:var(--radius-sm);font-size:0.8125rem;color:var(--danger);">
+            ⚠️ Attend <strong>${needed} more consecutive classes</strong> to reach ${att.minRequired}% minimum.
+          </div>` : `<div style="margin-top:0.75rem;padding:0.5rem 0.75rem;background:var(--success-light);border-radius:var(--radius-sm);font-size:0.8125rem;color:var(--success);">
+            ✅ You can miss ${Math.floor((s.present - att.minRequired/100 * s.total) / (1 - att.minRequired/100))} more classes and still be at ${att.minRequired}%.
+          </div>`}
         </div>`;
       }).join('')}
+    </div>
+
+    <div style="margin-top:1rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius);font-size:0.8125rem;color:var(--text-muted);text-align:center;">
+      ℹ️ Minimum required attendance: <strong>${att.minRequired}%</strong>. Contact your HOD for attendance-related issues.
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDENT CGPA
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentCGPA() {
   const user = APP_STATE.currentUser;
-  const student = APP_DATA.students.find(s => s.id === user.id) || {};
   const results = APP_DATA.semesterResults[user.id] || [];
   const cgpa = calculateCGPA(results);
-  const selectedSem = APP_STATE.selectedSemester || 5;
-  const semData = results.find(r => r.semester === selectedSem) || results[results.length - 1] || {};
-
-  const gradeColors = { 'O': '#10b981', 'A+': '#4f46e5', 'A': '#06b6d4', 'B+': '#f59e0b', 'B': '#f97316', 'C': '#ef4444' };
+  const currentSem = APP_STATE.selectedSemester || 5;
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📊 Academic Performance</h1>
-      <p class="page-subtitle">${student.name || user.name} • ${user.id} • ${user.department}</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📊 Academic Performance</div>
+        <div class="page-subtitle">${user.name} | ${user.id} | ${user.department}</div>
+      </div>
     </div>
 
-    <!-- CGPA Card -->
-    <div class="cgpa-hero-card">
+    <!-- CGPA Overview -->
+    <div class="two-col-layout section-mb">
       <div class="cgpa-display">
         <div class="cgpa-number">${cgpa}</div>
-        <div class="cgpa-label">Cumulative GPA</div>
-        <div class="cgpa-scale">out of 10.00</div>
+        <div class="cgpa-label">Cumulative GPA (CGPA)</div>
+        <div class="cgpa-scale">Out of 10.0 | Based on ${results.filter(r=>r.sgpa).length} completed semesters</div>
+        <div style="margin-top:1rem;display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+          ${results.filter(r => r.sgpa).map(r => `
+          <div style="text-align:center;">
+            <div style="font-size:1.125rem;font-weight:700;color:var(--primary);">${r.sgpa}</div>
+            <div style="font-size:0.6875rem;color:var(--text-muted);">Sem ${r.semester}</div>
+          </div>`).join('')}
+        </div>
       </div>
-      <div class="cgpa-sems">
-        ${results.filter(r => r.sgpa !== null).map(r => `
-        <div class="sem-sgpa-item">
-          <div class="sem-sgpa-bar-wrap">
-            <div class="sem-sgpa-bar" style="height:${(parseFloat(r.sgpa)/10)*80}px;background:linear-gradient(to top,#4f46e5,#7c3aed)"></div>
-          </div>
-          <div class="sem-sgpa-val">${r.sgpa}</div>
-          <div class="sem-sgpa-lbl">Sem ${r.semester}</div>
-        </div>`).join('')}
-      </div>
-    </div>
-
-    <!-- Chart -->
-    <div class="section-card">
-      <h2 class="section-card-title">📈 SGPA Trend</h2>
-      <div class="chart-container" style="height:280px">
-        <canvas id="sgpaChart"></canvas>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📈 SGPA Trend</div></div>
+        <div class="card-body">
+          <div class="chart-wrapper"><canvas id="sgpaChart"></canvas></div>
+        </div>
       </div>
     </div>
 
     <!-- Semester Selector -->
-    <div class="section-card">
-      <div class="section-card-header">
-        <h2 class="section-card-title">📋 Subject-wise Marks</h2>
+    <div class="card section-mb">
+      <div class="card-header">
+        <div class="card-title">📚 Semester Results</div>
         <div class="sem-tabs">
-          ${results.map(r => `<button class="sem-tab ${r.semester === selectedSem ? 'active' : ''}" onclick="APP_STATE.selectedSemester=${r.semester}; navigate('student-cgpa')">Sem ${r.semester}</button>`).join('')}
+          ${results.map(r => `<button class="sem-tab ${r.semester === currentSem ? 'active' : ''}" data-sem="${r.semester}" onclick="selectSemester(${r.semester})">${r.sgpa ? 'Sem '+r.semester : 'Sem '+r.semester+' (Current)'}</button>`).join('')}
         </div>
       </div>
-      ${semData.subjects ? `
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Subject</th>
-              <th>Code</th>
-              <th>Credits</th>
-              <th>Internal</th>
-              <th>External</th>
-              <th>Total</th>
-              <th>Grade</th>
-              <th>Grade Points</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${semData.subjects.map(s => `
-            <tr>
-              <td>${s.name}</td>
-              <td><code>${s.code}</code></td>
-              <td class="text-center">${s.credits}</td>
-              <td class="text-center">${s.marksInternal ?? '–'}</td>
-              <td class="text-center">${s.marksExternal ?? '–'}</td>
-              <td class="text-center font-semibold">${s.marksInternal && s.marksExternal ? s.marksInternal + s.marksExternal : '–'}</td>
-              <td class="text-center">${s.grade ? `<span class="grade-badge" style="background:${gradeColors[s.grade]||'#94a3b8'}">${s.grade}</span>` : '<span class="text-muted">In Progress</span>'}</td>
-              <td class="text-center">${s.gradePoints ?? '–'}</td>
-            </tr>`).join('')}
-          </tbody>
-          ${semData.sgpa ? `
-          <tfoot>
-            <tr>
-              <td colspan="2" class="font-semibold">Semester Result</td>
-              <td class="text-center font-semibold">${semData.totalCredits}</td>
-              <td colspan="4"></td>
-              <td class="text-center"><strong class="text-primary">SGPA: ${semData.sgpa}</strong></td>
-            </tr>
-          </tfoot>` : ''}
-        </table>
-      </div>` : '<p class="empty-state">No data available for this semester.</p>'}
+      <div id="subject-table-container">
+        ${renderSemesterTable(currentSem)}
+      </div>
     </div>
 
-    <!-- CGPA Calculation Info -->
-    <div class="section-card">
-      <h2 class="section-card-title">📐 Grading Scale (10-Point Scale)</h2>
-      <div class="grade-scale-grid">
-        ${[
-          { grade:'O', range:'90-100', gp:10, color:'#10b981' },
-          { grade:'A+', range:'80-89', gp:9, color:'#4f46e5' },
-          { grade:'A', range:'70-79', gp:9, color:'#06b6d4' },
-          { grade:'B+', range:'60-69', gp:8, color:'#f59e0b' },
-          { grade:'B', range:'50-59', gp:7, color:'#f97316' },
-          { grade:'C', range:'40-49', gp:6, color:'#ef4444' },
-          { grade:'F', range:'Below 40', gp:0, color:'#6b7280' },
-        ].map(g => `
-        <div class="grade-scale-item">
-          <div class="grade-scale-badge" style="background:${g.color}">${g.grade}</div>
-          <div class="grade-scale-info">
-            <div class="grade-scale-range">${g.range} marks</div>
-            <div class="grade-scale-gp">${g.gp} Grade Points</div>
+    <!-- CGPA Explanation -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">ℹ️ CGPA Calculation</div></div>
+      <div class="card-body">
+        <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:1rem;">CGPA is calculated as the credit-weighted average of all semester GPAs (SGPAs).</p>
+        <div style="font-size:0.875rem;background:var(--bg-secondary);border-radius:var(--radius);padding:1rem;font-family:monospace;">
+          SGPA = Σ(Grade Points × Credits) / Σ Credits<br>
+          CGPA = Σ(SGPA × Semester Credits) / Σ Total Credits
+        </div>
+        <div style="margin-top:1rem;">
+          <div style="font-weight:600;font-size:0.875rem;margin-bottom:0.5rem;">Grading Scale:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+            ${APP_DATA.config.gradingScale.map(g => `<span class="badge badge-secondary" style="padding:0.25rem 0.625rem;">${g.grade} (${g.range}) = ${g.points}</span>`).join('')}
           </div>
-        </div>`).join('')}
+        </div>
       </div>
-      <p class="text-muted text-sm mt-3">CGPA is calculated as the weighted average of SGPA across all completed semesters.</p>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+function renderSemesterTable(sem) {
+  const user = APP_STATE.currentUser;
+  const results = APP_DATA.semesterResults[user.id] || [];
+  const semester = results.find(r => r.semester === sem);
+  if (!semester) return '<div class="empty-state"><div class="empty-state-icon">📚</div><div class="empty-state-title">No data for this semester</div></div>';
+
+  const sgpa = semester.sgpa || calculateSGPA(semester.subjects);
+
+  return `
+  <div class="table-wrapper">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Subject</th>
+          <th>Code</th>
+          <th>Credits</th>
+          <th>Internal</th>
+          <th>External</th>
+          <th>Total</th>
+          <th>Grade</th>
+          <th>Grade Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${semester.subjects.map(s => `
+        <tr>
+          <td style="font-weight:600;">${s.name}</td>
+          <td><code style="font-size:0.75rem;background:var(--bg-secondary);padding:0.125rem 0.375rem;border-radius:4px;">${s.code}</code></td>
+          <td style="text-align:center;">${s.credits}</td>
+          <td style="text-align:center;">${s.marksInternal ?? '-'}</td>
+          <td style="text-align:center;">${s.marksExternal ?? '-'}</td>
+          <td style="text-align:center;font-weight:700;">${s.total ?? '-'}</td>
+          <td style="text-align:center;">${s.grade ? `<span class="badge badge-${s.gradePoints >= 9 ? 'success' : s.gradePoints >= 7 ? 'primary' : s.gradePoints >= 5 ? 'warning' : 'danger'}">${s.grade}</span>` : '<span class="badge badge-secondary">Pending</span>'}</td>
+          <td style="text-align:center;font-weight:700;color:var(--primary);">${s.gradePoints ?? '-'}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--bg-secondary);">
+          <td colspan="2" style="font-weight:700;">Semester Total</td>
+          <td style="text-align:center;font-weight:700;">${semester.subjects.reduce((s,sub)=>s+sub.credits,0)}</td>
+          <td colspan="3"></td>
+          <td colspan="2" style="text-align:center;font-weight:800;color:var(--primary);">SGPA: ${sgpa || 'TBD'}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>`;
+}
+
+function selectSemester(sem) {
+  APP_STATE.selectedSemester = sem;
+  const container = document.getElementById('subject-table-container');
+  if (container) container.innerHTML = renderSemesterTable(sem);
+  document.querySelectorAll('.sem-tab').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.sem) === sem);
+  });
+}
+
+// ============================================================
 // STUDENT TIMETABLE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentTimetable() {
   const user = APP_STATE.currentUser;
   const tt = APP_DATA.timetable[user.id] || {};
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-  const typeColors = { theory:'#4f46e5', lab:'#0891b2', tutorial:'#059669', 'office-hours':'#d97706', meeting:'#7c3aed' };
-
-  // Collect all unique times
-  const allTimes = new Set();
-  days.forEach(d => (tt[d] || []).forEach(c => allTimes.add(c.time)));
-  const timeSlots = [...allTimes].sort();
+  const todayDay = getDayName();
+  const allTimes = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-1:00', '2:00-4:00'];
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">⏰ My Timetable</h1>
-      <p class="page-subtitle">Semester 5 – Academic Year 2024-25</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">⏰ Timetable</div>
+        <div class="page-subtitle">Academic Year 2026-27 | Semester ${user.semester}</div>
+      </div>
     </div>
 
     <!-- Legend -->
-    <div class="tt-legend">
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#4f46e5"></span>Theory</div>
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#0891b2"></span>Lab</div>
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#059669"></span>Tutorial</div>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1.25rem;">
+      <span style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;"><span style="width:12px;height:12px;border-radius:3px;background:var(--primary);display:inline-block;"></span>Lecture</span>
+      <span style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;"><span style="width:12px;height:12px;border-radius:3px;background:var(--teal);display:inline-block;"></span>Lab</span>
+      <span style="display:flex;align-items:center;gap:0.375rem;font-size:0.8125rem;"><span style="width:12px;height:12px;border-radius:3px;background:var(--accent);display:inline-block;"></span>Project</span>
+      ${todayDay !== 'Sunday' ? `<span class="badge badge-primary" style="margin-left:auto;">📅 Today: ${todayDay}</span>` : ''}
     </div>
 
-    <div class="timetable-wrapper">
-      <div class="timetable-grid" style="grid-template-columns: 100px repeat(${days.length}, 1fr)">
-        <!-- Header -->
-        <div class="tt-header-cell tt-time-header">Time</div>
-        ${days.map(d => `<div class="tt-header-cell ${d === todayName ? 'tt-today' : ''}">${d}${d === todayName ? ' <span class="today-tag">Today</span>' : ''}</div>`).join('')}
+    <div class="card">
+      <div class="card-body" style="padding:1rem;overflow-x:auto;">
+        <div style="display:grid;grid-template-columns:80px repeat(6,1fr);gap:0.5rem;min-width:700px;">
+          <!-- Header -->
+          <div></div>
+          ${days.map(d => `<div class="timetable-header ${d === todayDay ? 'today' : ''}">${d.substring(0,3)}<br><span style="font-size:0.625rem;font-weight:400;">${d}</span></div>`).join('')}
 
-        <!-- Rows -->
-        ${timeSlots.map(time => `
-          <div class="tt-time-cell">${time.split('–')[0].trim()}</div>
-          ${days.map(d => {
-            const classes = (tt[d] || []).filter(c => c.time === time);
-            if (!classes.length) return `<div class="tt-cell tt-empty"></div>`;
-            return classes.map(c => `
-              <div class="tt-cell tt-class" style="border-left:3px solid ${typeColors[c.type]||'#94a3b8'};background:${typeColors[c.type]||'#94a3b8'}22">
-                <div class="tt-class-subject">${c.subject}</div>
-                <div class="tt-class-meta">${c.professor}</div>
-                <div class="tt-class-room">📍 ${c.room}</div>
-                <span class="tt-class-type" style="background:${typeColors[c.type]||'#94a3b8'}">${c.type}</span>
-              </div>`).join('');
-          }).join('')}
-        `).join('')}
+          <!-- Rows -->
+          ${allTimes.map(time => `
+            <div class="timetable-time">${time}</div>
+            ${days.map(day => {
+              const cls = (tt[day] || []).find(c => c.time === time);
+              if (!cls) return '<div></div>';
+              return `<div class="timetable-class ${cls.type.toLowerCase()}">
+                <div class="timetable-subject">${cls.subject}</div>
+                <div class="timetable-meta">${cls.professor.split(' ').pop()}<br>${cls.room}</div>
+              </div>`;
+            }).join('')}
+          `).join('')}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDENT ASSIGNMENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentAssignments() {
   const user = APP_STATE.currentUser;
-  const allAssignments = APP_DATA.assignments.filter(a => a.studentId === user.id);
-  const filter = APP_STATE.assignmentFilter || 'all';
-  const filtered = filter === 'all' ? allAssignments : allAssignments.filter(a => a.status === filter);
-
-  const statusCounts = { all: allAssignments.length, pending: 0, submitted: 0, evaluated: 0, late: 0 };
-  allAssignments.forEach(a => { if (statusCounts[a.status] !== undefined) statusCounts[a.status]++; });
+  const assignments = APP_DATA.assignments;
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📝 My Assignments</h1>
-      <p class="page-subtitle">Semester 5 – All Subjects</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📝 Assignments</div>
+        <div class="page-subtitle">Semester ${user.semester} | ${user.department}</div>
+      </div>
     </div>
 
-    <div class="filter-tabs">
-      ${[['all','All'],['pending','Pending'],['submitted','Submitted'],['evaluated','Evaluated'],['late','Late']].map(([val,lbl]) => `
-      <button class="filter-tab ${filter === val ? 'active' : ''}" onclick="APP_STATE.assignmentFilter='${val}'; navigate('student-assignments')">
-        ${lbl} <span class="filter-count">${statusCounts[val] || 0}</span>
-      </button>`).join('')}
+    <div class="pill-tabs" id="assign-tabs">
+      <button class="pill-tab active" onclick="filterAssignments('all',this)">All (${assignments.length})</button>
+      <button class="pill-tab" onclick="filterAssignments('pending',this)">Pending</button>
+      <button class="pill-tab" onclick="filterAssignments('submitted',this)">Submitted</button>
+      <button class="pill-tab" onclick="filterAssignments('evaluated',this)">Evaluated</button>
     </div>
 
-    <div class="assignments-list">
-      ${filtered.length === 0 ? '<div class="empty-state-card">No assignments found for this filter.</div>' :
-        filtered.map(a => {
-          const daysLeft = getDaysUntil(a.dueDate);
-          const urgent = a.status === 'pending' && daysLeft <= 3;
-          return `
-          <div class="assignment-card ${urgent ? 'assignment-urgent' : ''}">
-            <div class="assignment-card-header">
-              <div class="assignment-card-title-area">
-                <h3 class="assignment-card-title">${a.title}</h3>
-                <span class="badge badge-${getStatusColor(a.status)}">${a.status.charAt(0).toUpperCase() + a.status.slice(1)}</span>
-              </div>
-              <div class="assignment-card-meta">
-                <span class="assignment-subject">${a.subject} (${a.subjectCode})</span>
-                <span class="assignment-faculty">👨‍🏫 ${a.faculty}</span>
-              </div>
-            </div>
-            <p class="assignment-card-desc">${a.description}</p>
-            <div class="assignment-card-footer">
-              <div class="assignment-dates">
-                <span>📅 Assigned: ${formatDate(a.assignedDate)}</span>
-                <span class="${urgent ? 'text-danger font-semibold' : ''}">⏰ Due: ${formatDate(a.dueDate)}${a.status === 'pending' ? ` (${daysLeft > 0 ? daysLeft + ' days left' : 'Overdue'})` : ''}</span>
-                ${a.submittedDate ? `<span class="text-success">✅ Submitted: ${formatDate(a.submittedDate)}</span>` : ''}
-              </div>
-              <div class="assignment-marks">
-                ${a.obtainedMarks !== null ? `
-                <div class="marks-badge">
-                  <span class="marks-obtained">${a.obtainedMarks}</span>
-                  <span class="marks-sep">/</span>
-                  <span class="marks-max">${a.maxMarks}</span>
-                </div>` : `<span class="text-muted text-sm">Max: ${a.maxMarks} marks</span>`}
-              </div>
-            </div>
-            ${a.feedback ? `<div class="assignment-feedback">💬 <em>${a.feedback}</em></div>` : ''}
-            ${a.status === 'pending' ? `
-            <div class="assignment-actions">
-              <button class="btn btn-primary btn-sm" onclick="showToast('File upload coming soon!', 'info')">📎 Submit Assignment</button>
-            </div>` : ''}
-          </div>`;
-        }).join('')}
+    <div id="assignments-list">
+      ${renderAssignmentCards(assignments, user.id)}
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+function renderAssignmentCards(assignments, userId) {
+  if (!assignments.length) return `<div class="empty-state"><div class="empty-state-icon">📝</div><div class="empty-state-title">No assignments found</div></div>`;
+
+  return assignments.map(a => {
+    const studentStatus = a.studentStatus[userId];
+    const isObj = typeof studentStatus === 'object' && studentStatus !== null;
+    const status = isObj ? studentStatus.status : (studentStatus || 'pending');
+    const days = getDaysUntil(a.dueDate);
+    const urgent = days <= 3 && status === 'pending';
+
+    return `
+    <div class="assignment-card ${urgent ? 'urgent' : days <= 7 && status === 'pending' ? 'warning-due' : ''}" style="margin-bottom:1rem;">
+      <div style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.375rem;flex-wrap:wrap;">
+            <span class="badge badge-${status === 'pending' ? (urgent ? 'danger' : 'warning') : status === 'submitted' ? 'info' : status === 'evaluated' ? 'success' : 'danger'}">${getStatusLabel(status)}</span>
+            <span class="badge badge-secondary">${a.subject}</span>
+            ${urgent ? '<span class="badge badge-danger">🔥 Due Soon</span>' : ''}
+          </div>
+          <div style="font-size:1rem;font-weight:700;margin-bottom:0.375rem;">${a.title}</div>
+          <div style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.5;">${a.description.substring(0, 150)}${a.description.length > 150 ? '...' : ''}</div>
+          <div style="margin-top:0.75rem;font-size:0.8125rem;color:var(--text-muted);">👨‍🏫 ${a.faculty} &nbsp;|&nbsp; 📅 Due: ${formatDate(a.dueDate)} &nbsp;|&nbsp; Max Marks: ${a.maxMarks}</div>
+          ${isObj && studentStatus.marks !== undefined ? `<div style="margin-top:0.5rem;font-size:0.8125rem;">
+            <strong>Marks: ${studentStatus.marks}/${a.maxMarks}</strong>
+            ${studentStatus.comments ? `<br><span style="color:var(--text-muted);">💬 ${studentStatus.comments}</span>` : ''}
+          </div>` : ''}
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:1.375rem;font-weight:800;color:${days <= 0 ? 'var(--danger)' : days <= 3 ? 'var(--danger)' : days <= 7 ? 'var(--warning)' : 'var(--text-secondary)'};">${days <= 0 ? 'Overdue' : days + ' days'}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);">remaining</div>
+          ${status === 'pending' ? `<button class="btn btn-primary btn-sm" style="margin-top:0.75rem;" onclick="showToast('Submission portal not available in demo.','info')">Submit</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterAssignments(filter, btn) {
+  document.querySelectorAll('#assign-tabs .pill-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const user = APP_STATE.currentUser;
+  let filtered = APP_DATA.assignments;
+  if (filter !== 'all') {
+    filtered = APP_DATA.assignments.filter(a => {
+      const s = a.studentStatus[user.id];
+      const status = typeof s === 'object' && s ? s.status : (s || 'pending');
+      return status === filter;
+    });
+  }
+  document.getElementById('assignments-list').innerHTML = renderAssignmentCards(filtered, user.id);
+}
+
+// ============================================================
 // STUDENT EXAMS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentExams() {
-  const exams = APP_DATA.upcomingExams || [];
+  const user = APP_STATE.currentUser;
+  const exams = APP_DATA.upcomingExams;
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📚 Exam Schedule</h1>
-      <p class="page-subtitle">Mid-Semester Examinations – October 2024</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📚 Examinations</div>
+        <div class="page-subtitle">Mid-Semester Exams | October 2026</div>
+      </div>
     </div>
 
-    <div class="exam-grid">
-      ${exams.map((e, i) => {
-        const daysLeft = getDaysUntil(e.date);
-        const urgency = daysLeft <= 2 ? 'exam-urgent' : daysLeft <= 5 ? 'exam-soon' : '';
-        const colors = ['#4f46e5','#06b6d4','#10b981','#f59e0b'];
+    <!-- Exam Alert -->
+    <div style="background:var(--warning-light);border:1px solid var(--warning);border-radius:var(--radius-md);padding:1rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:0.75rem;">
+      <span style="font-size:1.25rem;">📢</span>
+      <div>
+        <strong>Mid-Semester Examinations:</strong> Oct 20–25, 2026 &nbsp;·&nbsp; Report 15 mins early &nbsp;·&nbsp; Carry ID card
+      </div>
+    </div>
+
+    <!-- Exam Cards -->
+    <div style="display:grid;gap:1rem;">
+      ${exams.map(e => {
+        const days = getDaysUntil(e.date);
         return `
-        <div class="exam-card ${urgency}">
-          <div class="exam-card-header" style="background:${colors[i % colors.length]}">
-            <div class="exam-card-type">${e.type}</div>
-            <div class="exam-countdown">
-              ${daysLeft <= 0 ? '<span class="badge badge-danger">Today!</span>' : `<span class="countdown-num">${daysLeft}</span><span class="countdown-lbl">days</span>`}
+        <div class="card">
+          <div class="card-body" style="display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;">
+            <div style="text-align:center;min-width:80px;padding:1rem;background:linear-gradient(135deg,var(--primary-50),var(--primary-100));border-radius:var(--radius-md);">
+              <div style="font-size:1.5rem;font-weight:800;color:var(--primary);">${new Date(e.date).getDate()}</div>
+              <div style="font-size:0.75rem;color:var(--primary);font-weight:600;">${new Date(e.date).toLocaleString('en', {month:'short'})}</div>
             </div>
-          </div>
-          <div class="exam-card-body">
-            <h3 class="exam-subject">${e.subject}</h3>
-            <div class="exam-code">${e.subjectCode}</div>
-            <div class="exam-details">
-              <div class="exam-detail"><span>📅</span><span>${formatDate(e.date)}</span></div>
-              <div class="exam-detail"><span>⏰</span><span>${e.time}</span></div>
-              <div class="exam-detail"><span>📍</span><span>${e.venue}</span></div>
-              <div class="exam-detail"><span>🪑</span><span>Seat No: ${e.seatNo}</span></div>
+            <div style="flex:1;min-width:200px;">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.375rem;">
+                <span style="font-size:1rem;font-weight:700;">${e.subject}</span>
+                <span class="badge badge-info">${e.type}</span>
+                <code style="font-size:0.75rem;background:var(--bg-secondary);padding:0.125rem 0.375rem;border-radius:4px;">${e.code}</code>
+              </div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.6;">
+                🕐 ${e.time} &nbsp;·&nbsp; ⏱ ${e.duration} &nbsp;·&nbsp; 📍 ${e.room}<br>
+                📖 ${e.syllabus}
+              </div>
+              <div style="margin-top:0.5rem;font-size:0.8125rem;color:var(--text-muted);">
+                Max: ${e.maxMarks} marks &nbsp;·&nbsp; Passing: ${e.passingMarks} marks
+              </div>
             </div>
-            <div class="exam-syllabus">
-              <div class="exam-syllabus-title">📖 Syllabus</div>
-              <p class="exam-syllabus-content">${e.syllabus}</p>
+            <div style="text-align:center;">
+              <div style="font-size:1.75rem;font-weight:800;color:${days<=5?'var(--danger)':days<=10?'var(--warning)':'var(--primary)'};">${days}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">days left</div>
             </div>
           </div>
         </div>`;
@@ -1267,597 +1324,652 @@ function renderStudentExams() {
     </div>
 
     <!-- Preparation Tips -->
-    <div class="section-card mt-4">
-      <h2 class="section-card-title">💡 Exam Preparation Tips</h2>
-      <div class="tips-grid">
-        <div class="tip-card"><span class="tip-icon">📖</span><div><strong>Revise Past Papers</strong><p>Go through previous year question papers to understand exam patterns.</p></div></div>
-        <div class="tip-card"><span class="tip-icon">📝</span><div><strong>Create a Study Plan</strong><p>Divide the syllabus into manageable chunks and follow a timetable.</p></div></div>
-        <div class="tip-card"><span class="tip-icon">💾</span><div><strong>Use Study Materials</strong><p>Access all lecture notes and resources from the study materials section.</p></div></div>
-        <div class="tip-card"><span class="tip-icon">😴</span><div><strong>Rest Well</strong><p>Ensure 7-8 hours of sleep during exam period for optimal performance.</p></div></div>
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header"><div class="card-title">💡 Preparation Tips</div></div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:0.875rem;">
+          ${['📖 Review all unit notes and previous year papers', '⏰ Create a study schedule for each subject', '🤝 Form study groups with classmates', '✍️ Practice solving previous year questions', '💤 Get adequate sleep before exam day', '🎯 Focus on high-weightage topics first'].map(tip => `
+          <div style="display:flex;align-items:center;gap:0.625rem;font-size:0.875rem;padding:0.625rem;background:var(--bg-secondary);border-radius:var(--radius-sm);">${tip}</div>`).join('')}
+        </div>
+        <div style="margin-top:1rem;text-align:center;">
+          <button class="btn btn-primary" onclick="navigate('student-resources')">📚 Open Study Materials</button>
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// EVENTS (Shared)
-// ─────────────────────────────────────────────────────────────
-function renderEvents() {
+// ============================================================
+// EVENTS PAGE
+// ============================================================
+function renderEventsPage() {
   const user = APP_STATE.currentUser;
-  const filter = APP_STATE.eventFilter || 'upcoming';
-  const events = APP_DATA.events.filter(e => filter === 'all' ? true : e.status === filter);
-  const categories = ['All', ...new Set(APP_DATA.events.map(e => e.category))];
+  const upcoming = APP_DATA.events.filter(e => e.status === 'upcoming');
+  const past = APP_DATA.events.filter(e => e.status === 'past');
 
   return `
-  <div class="page-content">
-    <div class="events-hero">
-      <h1 class="events-hero-title">🎉 Campus Events</h1>
-      <p class="events-hero-sub">Discover and register for exciting events at ${APP_DATA.college.shortName}</p>
-    </div>
-
-    <!-- Filters -->
-    <div class="events-filter-bar">
-      <div class="filter-tabs">
-        ${[['upcoming','Upcoming'],['past','Past'],['all','All']].map(([val,lbl]) => `
-        <button class="filter-tab ${filter === val ? 'active' : ''}" onclick="APP_STATE.eventFilter='${val}'; navigate('${APP_STATE.currentPage}')">
-          ${lbl}
-        </button>`).join('')}
-      </div>
-      <div class="search-mini">
-        <input type="text" placeholder="Search events..." class="form-input" id="event-search" oninput="filterEventCards(this.value)">
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">🎉 Events & Activities</div>
+        <div class="page-subtitle">Discover and register for college events</div>
       </div>
     </div>
 
-    <div class="events-grid" id="events-grid">
-      ${events.map(e => {
-        const isRegistered = user && e.registered && e.registered.includes(user.id) || e.isRegistered;
-        const seatsLeft = e.maxParticipants - e.registeredCount;
-        return `
-        <div class="event-card" data-title="${e.title.toLowerCase()} ${e.category.toLowerCase()}">
-          <div class="event-card-banner" style="background:${e.imageColor}">
-            <span class="event-cat-tag">${e.category}</span>
-            <div class="event-banner-icon">${getCategoryEmoji(e.category)}</div>
-            ${e.prizes && e.prizes.length > 0 ? `<div class="event-prize-tag">🏆 Prizes</div>` : ''}
-          </div>
-          <div class="event-card-content">
-            <h3 class="event-title">${e.title}</h3>
-            <p class="event-desc">${e.description.substring(0, 120)}…</p>
-            <div class="event-info-grid">
-              <div class="event-info-item"><span>📅</span><span>${formatDate(e.date)}</span></div>
-              <div class="event-info-item"><span>⏰</span><span>${e.time}</span></div>
-              <div class="event-info-item"><span>📍</span><span>${e.venue}</span></div>
-              <div class="event-info-item"><span>👥</span><span>${e.registeredCount}/${e.maxParticipants}</span></div>
-            </div>
-            <div class="event-tags">
-              ${(e.tags || []).map(t => `<span class="event-tag">${t}</span>`).join('')}
-            </div>
-            <div class="event-card-actions">
-              <div class="event-seats ${seatsLeft < 20 ? 'text-danger' : 'text-muted'}">${seatsLeft} seats left</div>
-              ${user ? (isRegistered
-                ? `<button class="btn btn-success btn-sm" disabled>✅ Registered</button>`
-                : `<button class="btn btn-primary btn-sm" onclick="registerForEvent('${e.id}')">Register →</button>`)
-                : `<button class="btn btn-primary btn-sm" onclick="renderPage('login',{role:'student'})">Login to Register</button>`}
-            </div>
-          </div>
-        </div>`;
-      }).join('')}
-    </div>
-    ${events.length === 0 ? '<div class="empty-state-card">No events found.</div>' : ''}
-  </div>`;
-}
-
-function getCategoryEmoji(cat) {
-  const map = { 'Hackathon':'💻', 'Workshop':'🔧', 'Tech Fest':'🚀', 'Guest Lecture':'🎤', 'Sports':'⚽', 'Placement':'💼', 'Cultural':'🎭' };
-  return map[cat] || '🎉';
-}
-
-function filterEventCards(query) {
-  document.querySelectorAll('.event-card').forEach(card => {
-    const title = card.dataset.title || '';
-    card.style.display = title.includes(query.toLowerCase()) ? '' : 'none';
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
-// NOTICES
-// ─────────────────────────────────────────────────────────────
-function renderNotices() {
-  const notices = APP_DATA.notices;
-  const urgent = notices.filter(n => n.priority === 'urgent');
-  const rest = notices.filter(n => n.priority !== 'urgent');
-
-  return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📰 Notice Board</h1>
-      <p class="page-subtitle">Important announcements from ${APP_DATA.college.shortName}</p>
+    <div class="tabs" id="events-tabs">
+      <button class="tab active" onclick="showEventsTab('upcoming',this)">🗓 Upcoming (${upcoming.length})</button>
+      <button class="tab" onclick="showEventsTab('past',this)">📁 Past Events (${past.length})</button>
+      ${user ? `<button class="tab" onclick="showEventsTab('registered',this)">✅ My Registrations</button>` : ''}
     </div>
 
-    <!-- Search -->
-    <div class="search-bar-row">
-      <div class="search-container">
-        <span class="search-icon">🔍</span>
-        <input type="text" class="search-input" placeholder="Search notices..." oninput="filterNotices(this.value)">
+    <div class="search-filter-bar">
+      <div class="search-bar">
+        <span class="search-bar-icon">🔍</span>
+        <input type="text" placeholder="Search events..." oninput="filterEventsSearch(this.value)">
       </div>
-      <select class="form-select" onchange="filterNoticesByCategory(this.value)">
+      <select class="filter-select" onchange="filterEventsByCategory(this.value)">
         <option value="">All Categories</option>
-        ${[...new Set(notices.map(n => n.category))].map(c => `<option value="${c}">${c}</option>`).join('')}
+        ${[...new Set(APP_DATA.events.map(e=>e.category))].map(c=>`<option>${c}</option>`).join('')}
       </select>
     </div>
 
-    <!-- Urgent -->
-    ${urgent.length > 0 ? `
-    <div class="urgent-notices">
-      <div class="urgent-header">🚨 Urgent Notices</div>
-      ${urgent.map(n => `
-      <div class="notice-card notice-urgent">
-        <div class="notice-card-header">
-          <span class="badge badge-danger">URGENT</span>
-          <span class="badge badge-secondary">${n.category}</span>
-          <span class="text-muted text-sm ml-auto">${formatDate(n.date)}</span>
-        </div>
-        <h3 class="notice-card-title">${n.title}</h3>
-        <p class="notice-card-content">${n.content}</p>
-        <div class="notice-card-footer">
-          <span class="text-muted text-sm">Posted by: ${n.postedBy}</span>
-          ${n.attachmentUrl ? '<button class="btn btn-ghost btn-sm">📎 Attachment</button>' : ''}
-        </div>
-      </div>`).join('')}
-    </div>` : ''}
-
-    <!-- All Notices -->
-    <div class="notices-list" id="notices-list">
-      ${rest.map(n => `
-      <div class="notice-card ${!n.isRead ? 'notice-unread' : ''}" data-title="${n.title.toLowerCase()} ${n.category.toLowerCase()}">
-        <div class="notice-card-header">
-          <span class="badge badge-${n.priority === 'high' ? 'warning' : n.priority === 'medium' ? 'info' : 'secondary'}">${n.priority.toUpperCase()}</span>
-          <span class="badge badge-secondary">${n.category}</span>
-          ${!n.isRead ? '<span class="unread-dot">●</span>' : ''}
-          <span class="text-muted text-sm ml-auto">${formatDate(n.date)}</span>
-        </div>
-        <h3 class="notice-card-title">${n.title}</h3>
-        <p class="notice-card-content">${n.content.substring(0, 200)}${n.content.length > 200 ? '…' : ''}</p>
-        <div class="notice-card-footer">
-          <span class="text-muted text-sm">📌 ${n.postedBy}</span>
-          <span class="text-muted text-sm">👥 ${n.targetAudience}</span>
-          ${n.attachmentUrl ? '<button class="btn btn-ghost btn-sm">📎 View Attachment</button>' : ''}
-        </div>
-      </div>`).join('')}
+    <div id="events-container">
+      ${renderEventCards(upcoming, user)}
     </div>
   </div>`;
 }
 
-function filterNotices(query) {
-  document.querySelectorAll('#notices-list .notice-card').forEach(card => {
-    card.style.display = (card.dataset.title || '').includes(query.toLowerCase()) ? '' : 'none';
-  });
+function renderEventCards(events, user) {
+  if (!events.length) return `<div class="empty-state"><div class="empty-state-icon">🎉</div><div class="empty-state-title">No events found</div><div class="empty-state-desc">Check back later for upcoming events.</div></div>`;
+
+  return `<div class="grid-auto">
+    ${events.map(e => {
+      const registered = user && e.registered.includes(user.id);
+      const seatsLeft = e.seats - e.registeredSeats;
+      return `
+      <div class="event-card">
+        <div class="event-banner">
+          <span>${e.emoji}</span>
+          <span class="badge badge-${e.status === 'upcoming' ? 'primary' : 'secondary'}" style="position:absolute;top:10px;left:10px;">${e.category}</span>
+          ${registered ? '<span class="badge badge-success" style="position:absolute;top:10px;right:10px;">✓ Registered</span>' : ''}
+        </div>
+        <div class="event-body">
+          <div class="event-title">${escapeHtml(e.title)}</div>
+          <div class="event-info-row">
+            <span>📅 ${formatDateShort(e.date)} &nbsp;·&nbsp; ⏰ ${e.startTime}</span>
+            <span>📍 ${e.venue}</span>
+            <span>👥 ${e.organizer}</span>
+          </div>
+          <div class="event-seats">
+            <div class="seats-text"><span>Seats filled</span><span>${e.registeredSeats}/${e.seats}</span></div>
+            <div class="progress-bar"><div class="progress-fill ${seatsLeft < 10 ? 'danger' : seatsLeft < 30 ? 'warning' : 'success'}" style="width:${(e.registeredSeats/e.seats)*100}%"></div></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${seatsLeft} seats remaining</div>
+          </div>
+          <p style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.5;margin-bottom:0.875rem;">${e.description.substring(0,120)}...</p>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.875rem;">📋 Eligibility: ${e.eligibility} &nbsp;·&nbsp; Deadline: ${formatDateShort(e.registrationDeadline)}</div>
+          ${user && e.status === 'upcoming' ?
+            (registered
+              ? `<button class="btn btn-success btn-full btn-sm" disabled>✅ Registered</button>`
+              : seatsLeft <= 0
+                ? `<button class="btn btn-secondary btn-full btn-sm" disabled>🚫 Full</button>`
+                : `<button class="btn btn-primary btn-full btn-sm" onclick="registerForEvent('${e.id}')">Register Now</button>`)
+            : e.status === 'past'
+              ? `<button class="btn btn-secondary btn-full btn-sm" disabled>Event Completed</button>`
+              : `<button class="btn btn-primary btn-full btn-sm" onclick="navigate('login',{role:'student'})">Login to Register</button>`
+          }
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function showEventsTab(tab, btn) {
+  document.querySelectorAll('#events-tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const user = APP_STATE.currentUser;
+  let events;
+  if (tab === 'upcoming') events = APP_DATA.events.filter(e => e.status === 'upcoming');
+  else if (tab === 'past') events = APP_DATA.events.filter(e => e.status === 'past');
+  else events = APP_DATA.events.filter(e => user && e.registered.includes(user.id));
+  document.getElementById('events-container').innerHTML = renderEventCards(events, user);
+}
+
+function filterEventsSearch(q) {
+  const user = APP_STATE.currentUser;
+  const filtered = q ? APP_DATA.events.filter(e => e.title.toLowerCase().includes(q.toLowerCase()) || e.category.toLowerCase().includes(q.toLowerCase())) : APP_DATA.events;
+  document.getElementById('events-container').innerHTML = renderEventCards(filtered, user);
+}
+
+function filterEventsByCategory(cat) {
+  const user = APP_STATE.currentUser;
+  const filtered = cat ? APP_DATA.events.filter(e => e.category === cat) : APP_DATA.events;
+  document.getElementById('events-container').innerHTML = renderEventCards(filtered, user);
+}
+
+// ============================================================
+// NOTICES PAGE
+// ============================================================
+function renderNoticesPage() {
+  return `
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📢 Notice Board</div>
+        <div class="page-subtitle">All important announcements and updates</div>
+      </div>
+    </div>
+
+    <div class="search-filter-bar">
+      <div class="search-bar">
+        <span class="search-bar-icon">🔍</span>
+        <input type="text" placeholder="Search notices..." oninput="filterNotices(this.value)">
+      </div>
+      <select class="filter-select" onchange="filterNoticesByCategory(this.value)">
+        <option value="">All Categories</option>
+        ${[...new Set(APP_DATA.notices.map(n=>n.category))].map(c=>`<option>${c}</option>`).join('')}
+      </select>
+    </div>
+
+    <div id="notices-list">
+      ${renderNoticeItems(APP_DATA.notices)}
+    </div>
+  </div>`;
+}
+
+function renderNoticeItems(notices) {
+  if (!notices.length) return `<div class="empty-state"><div class="empty-state-icon">📢</div><div class="empty-state-title">No notices found</div></div>`;
+
+  return notices.map(n => `
+  <div class="notice-item ${n.priority === 'urgent' ? 'urgent' : ''}" style="margin-bottom:0.875rem;">
+    <div class="notice-header">
+      <div style="flex:1;">
+        <div class="notice-meta">
+          <span class="badge badge-${n.priority === 'urgent' ? 'danger' : n.priority === 'high' ? 'warning' : n.priority === 'medium' ? 'info' : 'secondary'}">${n.priority === 'urgent' ? '🚨 URGENT' : n.priority.toUpperCase()}</span>
+          <span class="badge badge-secondary">${n.category}</span>
+          <span style="font-size:0.75rem;color:var(--text-muted);">${n.department}</span>
+        </div>
+        <div class="notice-title">${escapeHtml(n.title)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:0.8125rem;font-weight:600;">${formatDateShort(n.date)}</div>
+        ${n.attachment ? `<span style="font-size:0.75rem;color:var(--primary);">📎 Attachment</span>` : ''}
+      </div>
+    </div>
+    <div class="notice-body">${n.description}</div>
+    <div style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted);">Posted by: <strong>${n.postedBy}</strong></div>
+  </div>`).join('');
+}
+
+function filterNotices(q) {
+  const filtered = q ? APP_DATA.notices.filter(n => n.title.toLowerCase().includes(q.toLowerCase()) || n.description.toLowerCase().includes(q.toLowerCase())) : APP_DATA.notices;
+  document.getElementById('notices-list').innerHTML = renderNoticeItems(filtered);
 }
 
 function filterNoticesByCategory(cat) {
-  document.querySelectorAll('#notices-list .notice-card').forEach(card => {
-    card.style.display = !cat || (card.dataset.title || '').includes(cat.toLowerCase()) ? '' : 'none';
-  });
+  const filtered = cat ? APP_DATA.notices.filter(n => n.category === cat) : APP_DATA.notices;
+  document.getElementById('notices-list').innerHTML = renderNoticeItems(filtered);
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDY RESOURCES
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudyResources() {
-  const resources = APP_DATA.studyResources;
-  const typeIcons = { notes:'📒', reference:'📘', 'previous-papers':'📄', pdf:'📑', 'question-bank':'❓', video:'🎥' };
-
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">💾 Study Materials</h1>
-      <p class="page-subtitle">Course resources uploaded by your faculty</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">💾 Study Resource Center</div>
+        <div class="page-subtitle">Notes, PDFs, previous papers, and more</div>
+      </div>
     </div>
 
-    <div class="filter-bar">
-      <select class="form-select" onchange="filterResources('subject', this.value)">
-        <option value="">All Subjects</option>
-        ${[...new Set(resources.map(r => r.subject))].map(s => `<option value="${s}">${s}</option>`).join('')}
-      </select>
-      <select class="form-select" onchange="filterResources('type', this.value)">
+    <div class="search-filter-bar">
+      <div class="search-bar">
+        <span class="search-bar-icon">🔍</span>
+        <input type="text" placeholder="Search resources..." oninput="filterResources(this.value)">
+      </div>
+      <select class="filter-select" onchange="filterResourcesByType(this.value)">
         <option value="">All Types</option>
-        ${[...new Set(resources.map(r => r.type))].map(t => `<option value="${t}">${t}</option>`).join('')}
+        ${[...new Set(APP_DATA.studyResources.map(r=>r.type))].map(t=>`<option>${t}</option>`).join('')}
       </select>
     </div>
 
-    <div class="resources-grid" id="resources-grid">
-      ${resources.map(r => `
-      <div class="resource-card" data-subject="${r.subject}" data-type="${r.type}">
-        <div class="resource-card-icon">${typeIcons[r.type] || '📄'}</div>
-        <div class="resource-card-body">
-          <h3 class="resource-title">${r.title}</h3>
-          <div class="resource-meta">
-            <span class="badge badge-primary">${r.subjectCode}</span>
-            <span class="badge badge-secondary">${r.type}</span>
-          </div>
-          <div class="resource-info">
-            <span>👨‍🏫 ${r.uploadedBy}</span>
-            <span>📅 ${formatDate(r.uploadedOn)}</span>
-            <span>📦 ${r.size}</span>
-            <span>⬇️ ${r.downloads} downloads</span>
-          </div>
-        </div>
-        <button class="btn btn-primary btn-sm resource-download" onclick="showToast('Downloading ${r.title}...', 'success')">
-          ⬇️ Download
-        </button>
-      </div>`).join('')}
+    <div id="resources-list">
+      ${renderResourceCards(APP_DATA.studyResources)}
     </div>
   </div>`;
 }
 
-function filterResources(field, value) {
-  document.querySelectorAll('.resource-card').forEach(card => {
-    const match = !value || card.dataset[field] === value;
-    card.style.display = match ? '' : 'none';
-  });
+function renderResourceCards(resources) {
+  if (!resources.length) return `<div class="empty-state"><div class="empty-state-icon">💾</div><div class="empty-state-title">No resources found</div></div>`;
+
+  const typeIcon = { 'Notes':'📖', 'PDF':'📄', 'Previous Papers':'📋', 'Reference':'📚', 'Question Bank':'❓', 'Video':'🎬' };
+  return `<div style="display:grid;gap:0.875rem;">
+    ${resources.map(r => `
+    <div class="card" style="transition:var(--transition);">
+      <div class="card-body" style="display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap;">
+        <div style="width:48px;height:48px;border-radius:var(--radius);background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;">${typeIcon[r.type] || '📄'}</div>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-weight:700;font-size:0.9375rem;margin-bottom:0.25rem;">${r.title}</div>
+          <div style="font-size:0.8125rem;color:var(--text-secondary);">${r.subject} · Semester ${r.semester} · ${r.department}</div>
+          <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">By ${r.uploadedBy} · ${formatDateShort(r.uploadDate)} · ${r.size} · ${r.downloads} downloads</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <span class="badge badge-primary">${r.type}</span>
+          <button class="btn btn-primary btn-sm" onclick="showToast('Download started for: ${escapeHtml(r.title)}','success')">⬇ Download</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+function filterResources(q) {
+  const filtered = q ? APP_DATA.studyResources.filter(r => r.title.toLowerCase().includes(q.toLowerCase()) || r.subject.toLowerCase().includes(q.toLowerCase())) : APP_DATA.studyResources;
+  document.getElementById('resources-list').innerHTML = renderResourceCards(filtered);
+}
+
+function filterResourcesByType(type) {
+  const filtered = type ? APP_DATA.studyResources.filter(r => r.type === type) : APP_DATA.studyResources;
+  document.getElementById('resources-list').innerHTML = renderResourceCards(filtered);
+}
+
+// ============================================================
 // LEAVE APPLICATION
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderLeaveApplication() {
   const user = APP_STATE.currentUser;
-  const leaves = (APP_DATA.leaveApplications[user.id] || []);
+  const myLeaves = APP_DATA.leaveApplications.filter(l => l.studentId === user.id);
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📋 Leave Application</h1>
-      <p class="page-subtitle">Apply for leave and track your applications</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📋 Leave Application</div>
+        <div class="page-subtitle">Apply for leave and track your applications</div>
+      </div>
     </div>
 
-    <div class="leave-layout">
+    <div class="two-col-layout">
       <!-- Apply Form -->
-      <div class="section-card">
-        <h2 class="section-card-title">✏️ Apply for Leave</h2>
-        <form class="leave-form" onsubmit="handleLeaveSubmit(event)">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📝 Apply for Leave</div></div>
+        <div class="card-body">
           <div class="form-group">
             <label class="form-label">Leave Type *</label>
-            <select id="leave-type" class="form-select" required>
-              <option value="">Select type</option>
-              <option>Medical Leave</option>
-              <option>Personal Leave</option>
+            <select id="leave-type" class="form-select">
+              <option value="">Select leave type</option>
+              <option>Medical</option>
+              <option>Personal</option>
+              <option>Academic</option>
               <option>Family Emergency</option>
-              <option>Academic Leave</option>
-              <option>Sports/Cultural Leave</option>
+              <option>Other</option>
             </select>
           </div>
-          <div class="form-row">
+          <div class="grid-2">
             <div class="form-group">
-              <label class="form-label">From Date *</label>
-              <input type="date" id="leave-start" class="form-input" min="${new Date().toISOString().split('T')[0]}" required>
+              <label class="form-label">Start Date *</label>
+              <input type="date" id="leave-start" class="form-input" min="${new Date().toISOString().split('T')[0]}">
             </div>
             <div class="form-group">
-              <label class="form-label">To Date *</label>
-              <input type="date" id="leave-end" class="form-input" min="${new Date().toISOString().split('T')[0]}" required>
+              <label class="form-label">End Date *</label>
+              <input type="date" id="leave-end" class="form-input" min="${new Date().toISOString().split('T')[0]}">
             </div>
           </div>
           <div class="form-group">
             <label class="form-label">Reason *</label>
-            <textarea id="leave-reason" class="form-textarea" rows="4" placeholder="Provide a detailed reason for your leave request..." required></textarea>
+            <textarea id="leave-reason" class="form-input" rows="4" placeholder="Describe your reason for leave..."></textarea>
           </div>
           <div class="form-group">
             <label class="form-label">Supporting Document</label>
-            <div class="file-upload-area" onclick="showToast('File upload coming soon!', 'info')">
-              <div class="file-upload-icon">📎</div>
-              <div class="file-upload-text">Click to upload document (Medical certificate, etc.)</div>
-              <div class="file-upload-note">Supported: PDF, JPG, PNG – Max 5MB</div>
-            </div>
+            <input type="file" class="form-input" accept=".pdf,.jpg,.png" style="padding:0.5rem;">
+            <div class="form-helper">Medical certificate, invitation letter, etc. (Optional)</div>
           </div>
-          <button type="submit" class="btn btn-primary btn-full">Submit Leave Application</button>
-        </form>
+          <button class="btn btn-primary btn-full" onclick="submitLeaveApplication()">Submit Application</button>
+        </div>
       </div>
 
-      <!-- Applications History -->
-      <div class="section-card">
-        <h2 class="section-card-title">📂 My Applications</h2>
-        ${leaves.length === 0 ? '<p class="empty-state">No leave applications yet.</p>' : `
-        <div class="leave-list">
-          ${leaves.map(l => `
-          <div class="leave-item">
-            <div class="leave-item-header">
-              <span class="badge badge-info">${l.type}</span>
-              <span class="badge badge-${getStatusColor(l.status)}">${l.status.toUpperCase()}</span>
-            </div>
-            <div class="leave-item-dates">${formatDate(l.fromDate)} → ${formatDate(l.toDate)} (${l.days} day${l.days !== 1 ? 's' : ''})</div>
-            <div class="leave-item-reason">${l.reason}</div>
-            <div class="leave-item-footer text-muted text-sm">
-              Applied: ${formatDate(l.appliedOn)}
-              ${l.approvedBy ? ` • Reviewed by: ${l.approvedBy}` : ''}
-              ${l.remark ? `<br>Remarks: ${l.remark}` : ''}
-            </div>
-          </div>`).join('')}
-        </div>`}
+      <!-- Leave History -->
+      <div class="card">
+        <div class="card-header"><div class="card-title">📁 My Leave Applications</div></div>
+        <div class="card-body" style="padding:0;">
+          ${myLeaves.length === 0 ? `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">No applications yet</div></div>` :
+            myLeaves.map(l => `
+            <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border-light);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.25rem;flex-wrap:wrap;gap:0.5rem;">
+                <span class="badge badge-${getStatusColor(l.status)}">${getStatusLabel(l.status)}</span>
+                <span class="badge badge-secondary">${l.type}</span>
+              </div>
+              <div style="font-size:0.8125rem;color:var(--text-primary);font-weight:600;margin:0.375rem 0;">${formatDateShort(l.startDate)} → ${formatDateShort(l.endDate)}</div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);">${l.reason}</div>
+              ${l.remarks ? `<div style="margin-top:0.5rem;font-size:0.75rem;padding:0.375rem 0.5rem;background:var(--bg-secondary);border-radius:var(--radius-sm);color:var(--text-secondary);">💬 ${l.remarks}</div>` : ''}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.375rem;">Applied: ${formatDateShort(l.appliedDate)}${l.reviewedBy ? ` · Reviewed by: ${l.reviewedBy}` : ''}</div>
+            </div>`).join('')}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-function handleLeaveSubmit(e) {
-  e.preventDefault();
+function submitLeaveApplication() {
   const type = document.getElementById('leave-type').value;
   const start = document.getElementById('leave-start').value;
   const end = document.getElementById('leave-end').value;
-  const reason = document.getElementById('leave-reason').value.trim();
-  if (!type || !start || !end || !reason) { showToast('Please fill all required fields.', 'error'); return; }
+  const reason = document.getElementById('leave-reason').value;
+  if (!type) { showToast('Please select a leave type.', 'warning'); return; }
+  if (!start || !end) { showToast('Please select start and end dates.', 'warning'); return; }
+  if (!reason.trim()) { showToast('Please enter a reason for leave.', 'warning'); return; }
   if (new Date(end) < new Date(start)) { showToast('End date cannot be before start date.', 'error'); return; }
-  const days = Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1;
-  const userId = APP_STATE.currentUser.id;
-  if (!APP_DATA.leaveApplications[userId]) APP_DATA.leaveApplications[userId] = [];
-  APP_DATA.leaveApplications[userId].push({
-    id: 'LEV' + Date.now(),
-    type, fromDate: start, toDate: end, days, reason,
-    appliedOn: new Date().toISOString().split('T')[0],
-    status: 'pending', approvedBy: null, approvedOn: null, remark: null, documentUrl: null
-  });
+
+  const newLeave = {
+    id: 'L' + Date.now(),
+    studentId: APP_STATE.currentUser.id,
+    studentName: APP_STATE.currentUser.name,
+    type, startDate: start, endDate: end, reason,
+    document: null, status: 'pending',
+    appliedDate: new Date().toISOString().split('T')[0],
+    reviewedBy: null, reviewDate: null, remarks: null
+  };
+  APP_DATA.leaveApplications.push(newLeave);
   showToast('Leave application submitted successfully!', 'success');
+
+  // Add notification
+  APP_STATE.notifications.unshift({
+    id: 'NT' + Date.now(), userId: APP_STATE.currentUser.id,
+    title: 'Leave Application Submitted',
+    message: `Your ${type} leave application for ${formatDateShort(start)} has been submitted.`,
+    type: 'application', time: 'just now', read: false, icon: '📋'
+  });
   navigate('student-leave');
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // CAMPUS SERVICES
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderCampusServices() {
   const user = APP_STATE.currentUser;
-  const apps = APP_DATA.campusApplications[user.id] || [];
   const services = [
-    { icon:'📜', name:'Bonafide Certificate', desc:'For loan, visa, or official purposes', days:'2-3 days' },
-    { icon:'🪪', name:'ID Card (Replacement)', desc:'Lost or damaged student ID', days:'1 day' },
-    { icon:'📋', name:'Official Transcript', desc:'Certified academic transcript', days:'5-7 days' },
-    { icon:'📚', name:'Library Extension', desc:'Extend book borrowing limit', days:'Same day' },
-    { icon:'🏠', name:'Hostel Application', desc:'Apply for hostel accommodation', days:'3-5 days' },
-    { icon:'🚌', name:'Bus Pass', desc:'Apply for college transport pass', days:'2 days' },
-    { icon:'🏆', name:'Achievement Certificate', desc:'For competition or awards', days:'3 days' },
-    { icon:'🎓', name:'Course Completion Letter', desc:'For internship or job', days:'2 days' },
-    { icon:'💰', name:'Scholarship Application', desc:'Apply for financial aid', days:'5-10 days' },
-    { icon:'🔬', name:'Lab Access Request', desc:'After-hours lab access', days:'1 day' },
-    { icon:'📸', name:'Photo Attestation', desc:'Attested photo for records', days:'Same day' },
-    { icon:'🩺', name:'Medical Certificate', desc:'From college medical center', days:'Same day' },
+    { icon:'📜', title:'Bonafide Certificate', desc:'Required for loans, scholarships, and official purposes', time:'3-5 working days' },
+    { icon:'🪪', title:'ID Card Replacement', desc:'Lost or damaged ID card replacement', time:'2-3 working days' },
+    { icon:'📋', title:'Transcript Request', desc:'Official academic transcript for higher studies abroad', time:'7-10 working days' },
+    { icon:'🏆', title:'Character Certificate', desc:'Certificate of good conduct for employment', time:'2-3 working days' },
+    { icon:'📚', title:'Library Membership', desc:'Extend library membership or add new books', time:'1 working day' },
+    { icon:'🏠', title:'Hostel Request', desc:'Room allotment, transfer, or amenity requests', time:'5-7 working days' },
+    { icon:'🚌', title:'Transport Request', desc:'Bus pass, route change, or transport queries', time:'3-5 working days' },
+    { icon:'🎓', title:'Scholarship Info', desc:'Government and college scholarship information', time:'Varies' },
+    { icon:'💻', title:'Technical Support', desc:'Lab issues, software access, or IT helpdesk', time:'1-2 working days' },
+    { icon:'📝', title:'Academic Complaint', desc:'Raise academic grievances and issues', time:'5-7 working days' },
+    { icon:'💬', title:'Faculty Feedback', desc:'Provide feedback on faculty and courses', time:'Immediate' },
+    { icon:'❓', title:'General Enquiry', desc:'Any other college-related queries', time:'1-2 working days' },
   ];
 
+  const myApps = APP_DATA.campusApplications.filter(a => a.studentId === user.id);
+
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">🏢 Campus Services</h1>
-      <p class="page-subtitle">Apply for various campus services and certificates</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">🏢 Campus Services</div>
+        <div class="page-subtitle">All digital college services in one place</div>
+      </div>
     </div>
 
-    <!-- Services Grid -->
-    <div class="services-grid">
-      ${services.map(s => `
-      <div class="service-card" onclick="openServiceModal('${s.name}')">
-        <div class="service-icon">${s.icon}</div>
-        <div class="service-body">
-          <div class="service-name">${s.name}</div>
-          <div class="service-desc">${s.desc}</div>
-          <div class="service-time">⏱️ Processing: ${s.days}</div>
-        </div>
-        <button class="btn btn-primary btn-sm mt-2">Apply</button>
-      </div>`).join('')}
+    <div class="tabs" id="services-tabs">
+      <button class="tab active" onclick="showServicesTab('services',this)">🛠 Services</button>
+      <button class="tab" onclick="showServicesTab('applications',this)">📁 My Applications (${myApps.length})</button>
     </div>
 
-    <!-- My Applications -->
-    <div class="section-card mt-4">
-      <h2 class="section-card-title">📂 My Applications</h2>
-      ${apps.length === 0 ? '<p class="empty-state">No applications submitted yet.</p>' : `
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Type</th><th>Purpose</th><th>Applied On</th><th>Status</th><th>Remarks</th></tr></thead>
-          <tbody>
-            ${apps.map(a => `
-            <tr>
-              <td>${a.type}</td>
-              <td>${a.purpose}</td>
-              <td>${formatDate(a.appliedOn)}</td>
-              <td><span class="badge badge-${getStatusColor(a.status)}">${a.status}</span></td>
-              <td class="text-muted text-sm">${a.remarks || '–'}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`}
+    <div id="services-content">
+      <div class="grid-auto">
+        ${services.map(s => `
+        <div class="card hover-lift" style="cursor:pointer;" onclick="openServiceModal('${s.title}')">
+          <div class="card-body" style="text-align:center;padding:1.5rem;">
+            <div style="font-size:2.25rem;margin-bottom:0.75rem;">${s.icon}</div>
+            <div style="font-weight:700;margin-bottom:0.375rem;">${s.title}</div>
+            <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.75rem;line-height:1.5;">${s.desc}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">⏱ ${s.time}</div>
+            <button class="btn btn-primary btn-sm" style="margin-top:0.875rem;" onclick="event.stopPropagation();openServiceModal('${s.title}')">Apply Now</button>
+          </div>
+        </div>`).join('')}
+      </div>
     </div>
   </div>`;
 }
 
-function openServiceModal(name) {
+function showServicesTab(tab, btn) {
+  document.querySelectorAll('#services-tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const user = APP_STATE.currentUser;
+
+  if (tab === 'services') {
+    navigate('student-services');
+    return;
+  }
+
+  const myApps = APP_DATA.campusApplications.filter(a => a.studentId === user.id);
+  document.getElementById('services-content').innerHTML = myApps.length === 0
+    ? `<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">No applications yet</div><div class="empty-state-desc">Use the services tab to submit applications.</div></div>`
+    : `<div class="table-wrapper"><table class="table">
+      <thead><tr><th>Service</th><th>Purpose</th><th>Submitted</th><th>Status</th><th>Remarks</th></tr></thead>
+      <tbody>${myApps.map(a => `
+      <tr>
+        <td style="font-weight:600;">${a.type}</td>
+        <td style="font-size:0.8125rem;">${a.purpose}</td>
+        <td style="font-size:0.8125rem;">${formatDateShort(a.submittedDate)}</td>
+        <td><span class="badge badge-${getStatusColor(a.status)}">${getStatusLabel(a.status)}</span></td>
+        <td style="font-size:0.8125rem;color:var(--text-secondary);">${a.remarks || '—'}</td>
+      </tr>`).join('')}
+      </tbody></table></div>`;
+}
+
+function openServiceModal(serviceName) {
   openModal(`
-  <div class="modal-inner">
-    <div class="modal-header">
-      <h2>Apply for ${name}</h2>
-      <button class="modal-close" onclick="closeModal(true)">✕</button>
+  <div class="modal-header">
+    <div class="modal-title">📋 Apply for ${serviceName}</div>
+    <button class="modal-close" onclick="closeModal(true)">✕</button>
+  </div>
+  <div class="modal-body">
+    <div class="form-group">
+      <label class="form-label">Purpose / Reason *</label>
+      <input type="text" id="service-purpose" class="form-input" placeholder="e.g. Bank loan application, University admission">
     </div>
-    <form onsubmit="submitServiceApplication(event, '${name}')">
-      <div class="form-group">
-        <label class="form-label">Purpose / Reason *</label>
-        <textarea id="svc-purpose" class="form-textarea" rows="3" placeholder="Describe the purpose of your application..." required></textarea>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Copies Required</label>
-        <input type="number" id="svc-copies" class="form-input" value="1" min="1" max="5">
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal(true)">Cancel</button>
-        <button type="submit" class="btn btn-primary">Submit Application</button>
-      </div>
-    </form>
+    <div class="form-group">
+      <label class="form-label">Additional Details</label>
+      <textarea class="form-input" rows="3" placeholder="Any additional information..."></textarea>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Supporting Documents (if any)</label>
+      <input type="file" class="form-input" style="padding:0.5rem;">
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal(true)">Cancel</button>
+    <button class="btn btn-primary" onclick="submitServiceApplication('${serviceName}')">Submit Application</button>
   </div>`);
 }
 
-function submitServiceApplication(e, name) {
-  e.preventDefault();
-  const purpose = document.getElementById('svc-purpose').value.trim();
-  if (!purpose) { showToast('Please provide a purpose.', 'error'); return; }
-  const userId = APP_STATE.currentUser.id;
-  if (!APP_DATA.campusApplications[userId]) APP_DATA.campusApplications[userId] = [];
-  APP_DATA.campusApplications[userId].push({
-    id: 'APP' + Date.now(), type: name, purpose,
-    appliedOn: new Date().toISOString().split('T')[0],
-    status: 'pending', completedOn: null, remarks: 'Application received, under review.'
-  });
+function submitServiceApplication(service) {
+  const purpose = document.getElementById('service-purpose').value.trim();
+  if (!purpose) { showToast('Please enter the purpose.', 'warning'); return; }
+  const newApp = {
+    id: 'CA' + Date.now(),
+    studentId: APP_STATE.currentUser.id,
+    studentName: APP_STATE.currentUser.name,
+    type: service, purpose,
+    submittedDate: new Date().toISOString().split('T')[0],
+    status: 'pending', remarks: null, processingDays: 3
+  };
+  APP_DATA.campusApplications.push(newApp);
   closeModal(true);
-  showToast(`${name} application submitted!`, 'success');
-  navigate('student-services');
+  showToast(`Application for ${service} submitted successfully!`, 'success');
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // COMPLAINTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderComplaints() {
   const user = APP_STATE.currentUser;
-  const complaints = APP_DATA.complaints[user.id] || [];
+  const myComplaints = APP_DATA.complaints.filter(c => c.studentId === user.id);
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📣 Grievance & Complaints</h1>
-      <p class="page-subtitle">Submit and track your complaints</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📣 Complaints & Feedback</div>
+        <div class="page-subtitle">Submit and track your grievances</div>
+      </div>
     </div>
-
-    <div class="leave-layout">
-      <div class="section-card">
-        <h2 class="section-card-title">📝 Submit Complaint</h2>
-        <form onsubmit="submitComplaint(event)">
+    <div class="two-col-layout">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📝 New Complaint</div></div>
+        <div class="card-body">
           <div class="form-group">
             <label class="form-label">Category *</label>
-            <select id="cmp-category" class="form-select" required>
+            <select id="complaint-cat" class="form-select">
               <option value="">Select category</option>
-              <option>Infrastructure</option>
-              <option>Academic</option>
-              <option>Faculty</option>
-              <option>Administration</option>
-              <option>Hostel</option>
-              <option>Transport</option>
-              <option>Ragging</option>
-              <option>Other</option>
+              <option>Academic</option><option>Infrastructure</option>
+              <option>Faculty Feedback</option><option>Technical</option>
+              <option>Library</option><option>Hostel</option>
+              <option>Transport</option><option>Other</option>
             </select>
           </div>
           <div class="form-group">
             <label class="form-label">Subject *</label>
-            <input type="text" id="cmp-subject" class="form-input" placeholder="Brief subject of complaint" required>
+            <input type="text" id="complaint-subject" class="form-input" placeholder="Brief subject of complaint">
           </div>
           <div class="form-group">
             <label class="form-label">Description *</label>
-            <textarea id="cmp-desc" class="form-textarea" rows="5" placeholder="Provide detailed description..." required></textarea>
+            <textarea id="complaint-desc" class="form-input" rows="4" placeholder="Describe the issue in detail..."></textarea>
           </div>
-          <div class="form-group">
-            <label class="form-label">Severity</label>
-            <select id="cmp-severity" class="form-select">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-            </select>
-          </div>
-          <button type="submit" class="btn btn-primary btn-full">Submit Complaint</button>
-        </form>
+          <button class="btn btn-primary btn-full" onclick="submitComplaint()">Submit Complaint</button>
+        </div>
       </div>
-
-      <div class="section-card">
-        <h2 class="section-card-title">📂 My Complaints</h2>
-        ${complaints.length === 0 ? '<p class="empty-state">No complaints submitted.</p>' : `
-        <div class="complaints-list">
-          ${complaints.map(c => `
-          <div class="complaint-item">
-            <div class="complaint-header">
-              <span class="badge badge-secondary">${c.category}</span>
-              <span class="badge badge-${getStatusColor(c.status)}">${c.status}</span>
-              <span class="badge badge-${c.severity === 'high' ? 'danger' : c.severity === 'medium' ? 'warning' : 'info'}">${c.severity}</span>
-            </div>
-            <div class="complaint-subject">${c.subject}</div>
-            <div class="complaint-desc text-muted text-sm">${c.description.substring(0, 150)}…</div>
-            <div class="complaint-footer text-sm">
-              <span>Submitted: ${formatDate(c.submittedOn)}</span>
-              ${c.resolvedOn ? `<span class="text-success">✅ Resolved: ${formatDate(c.resolvedOn)}</span>` : ''}
-            </div>
-            ${c.response ? `<div class="complaint-response">💬 <em>${c.response}</em></div>` : ''}
-          </div>`).join('')}
-        </div>`}
+      <div class="card">
+        <div class="card-header"><div class="card-title">📁 My Complaints</div></div>
+        <div class="card-body" style="padding:0;">
+          ${myComplaints.length === 0
+            ? `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">No complaints</div><div class="empty-state-desc">No issues raised yet.</div></div>`
+            : myComplaints.map(c => `
+            <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border-light);">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.375rem;flex-wrap:wrap;gap:0.375rem;">
+                <span class="badge badge-secondary">${c.category}</span>
+                <span class="badge badge-${getStatusColor(c.status)}">${getStatusLabel(c.status)}</span>
+              </div>
+              <div style="font-weight:700;font-size:0.875rem;">${c.subject}</div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);margin-top:0.25rem;">${c.description.substring(0,100)}...</div>
+              ${c.remarks ? `<div style="margin-top:0.5rem;font-size:0.75rem;padding:0.375rem;background:var(--bg-secondary);border-radius:var(--radius-sm);color:var(--text-secondary);">💬 ${c.remarks}</div>` : ''}
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">${formatDateShort(c.submittedDate)}</div>
+            </div>`).join('')}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-function submitComplaint(e) {
-  e.preventDefault();
-  const category = document.getElementById('cmp-category').value;
-  const subject = document.getElementById('cmp-subject').value.trim();
-  const description = document.getElementById('cmp-desc').value.trim();
-  const severity = document.getElementById('cmp-severity').value;
-  if (!category || !subject || !description) { showToast('Please fill all fields.', 'error'); return; }
-  const userId = APP_STATE.currentUser.id;
-  if (!APP_DATA.complaints[userId]) APP_DATA.complaints[userId] = [];
-  APP_DATA.complaints[userId].push({
-    id: 'CMP' + Date.now(), category, subject, description, severity,
-    submittedOn: new Date().toISOString().split('T')[0],
-    status: 'pending', resolvedOn: null, response: null
+function submitComplaint() {
+  const cat = document.getElementById('complaint-cat').value;
+  const subject = document.getElementById('complaint-subject').value.trim();
+  const desc = document.getElementById('complaint-desc').value.trim();
+  if (!cat || !subject || !desc) { showToast('Please fill all required fields.', 'warning'); return; }
+  APP_DATA.complaints.push({
+    id: 'CO' + Date.now(),
+    studentId: APP_STATE.currentUser.id, studentName: APP_STATE.currentUser.name,
+    category: cat, subject, description: desc,
+    submittedDate: new Date().toISOString().split('T')[0],
+    status: 'pending', remarks: null
   });
-  showToast('Complaint submitted successfully!', 'success');
+  showToast('Complaint submitted successfully! We will respond within 3 working days.', 'success');
   navigate('student-complaints');
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // STUDENT PROFILE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderStudentProfile() {
   const user = APP_STATE.currentUser;
-  const student = APP_DATA.students.find(s => s.id === user.id) || {};
   const results = APP_DATA.semesterResults[user.id] || [];
-  const cgpa = calculateCGPA(results);
   const att = APP_DATA.attendance[user.id] || { overall: 0 };
+  const cgpa = calculateCGPA(results);
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">👤 My Profile</h1>
-    </div>
-
-    <div class="profile-layout">
-      <div class="profile-sidebar-card">
-        <div class="profile-avatar-large">${user.name[0]}</div>
-        <h2 class="profile-name">${student.name || user.name}</h2>
-        <p class="profile-id">${user.id}</p>
-        <div class="profile-badges">
-          <span class="badge badge-primary">${student.department || user.department}</span>
-          <span class="badge badge-info">Semester ${user.semester}</span>
-          <span class="badge badge-secondary">Section ${student.section || 'A'}</span>
-        </div>
-        <div class="profile-stats">
-          <div class="profile-stat"><div class="profile-stat-val">${cgpa}</div><div class="profile-stat-lbl">CGPA</div></div>
-          <div class="profile-stat"><div class="profile-stat-val">${att.overall}%</div><div class="profile-stat-lbl">Attendance</div></div>
-          <div class="profile-stat"><div class="profile-stat-val">${student.batch || '2021-25'}</div><div class="profile-stat-lbl">Batch</div></div>
-        </div>
-        <button class="btn btn-outline btn-full mt-3" onclick="showToast('Profile editing coming soon!', 'info')">✏️ Edit Profile</button>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">👤 My Profile</div>
+        <div class="page-subtitle">Your academic profile and information</div>
       </div>
-
-      <div class="profile-main">
-        <div class="section-card">
-          <h2 class="section-card-title">📋 Personal Information</h2>
-          <div class="profile-info-grid">
-            <div class="profile-info-item"><span class="profile-info-label">Full Name</span><span class="profile-info-val">${student.name || user.name}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Roll Number</span><span class="profile-info-val">${student.rollNo || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Date of Birth</span><span class="profile-info-val">${student.dob ? formatDate(student.dob) : 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Gender</span><span class="profile-info-val">${student.gender || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Blood Group</span><span class="profile-info-val">${student.bloodGroup || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Email</span><span class="profile-info-val">${user.email || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Phone</span><span class="profile-info-val">${user.phone || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Address</span><span class="profile-info-val">${student.address || 'N/A'}</span></div>
+      <button class="btn btn-secondary" onclick="showToast('Profile editing not available in demo.','info')">✏️ Edit Profile</button>
+    </div>
+    <div class="two-col-layout">
+      <div>
+        <div class="card section-mb">
+          <div class="card-body" style="display:flex;gap:1.5rem;align-items:flex-start;flex-wrap:wrap;">
+            <div class="profile-avatar-large">${user.name[0]}</div>
+            <div style="flex:1;">
+              <div style="font-size:1.5rem;font-weight:800;">${user.name}</div>
+              <div style="color:var(--text-secondary);font-size:0.875rem;margin-bottom:0.75rem;">${user.designation || user.department}</div>
+              <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <span class="badge badge-primary">Semester ${user.semester}</span>
+                <span class="badge badge-secondary">Section ${user.section}</span>
+                <span class="badge badge-success">Active</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div class="section-card">
-          <h2 class="section-card-title">🎓 Academic Information</h2>
-          <div class="profile-info-grid">
-            <div class="profile-info-item"><span class="profile-info-label">Department</span><span class="profile-info-val">${user.department}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Programme</span><span class="profile-info-val">B.Tech</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Batch</span><span class="profile-info-val">${student.batch || '2021-2025'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Current CGPA</span><span class="profile-info-val font-semibold text-primary">${cgpa}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Scholarship</span><span class="profile-info-val">${student.scholarshipStatus || 'None'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Hostel</span><span class="profile-info-val">${student.hostel ? 'Yes' : 'No'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Parent Name</span><span class="profile-info-val">${student.parentName || 'N/A'}</span></div>
-            <div class="profile-info-item"><span class="profile-info-label">Parent Phone</span><span class="profile-info-val">${student.parentPhone || 'N/A'}</span></div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📋 Personal Information</div></div>
+          <div class="card-body" style="padding:0.5rem 1.25rem;">
+            ${[
+              { label:'Student ID', value: user.id },
+              { label:'Full Name', value: user.name },
+              { label:'Department', value: user.department },
+              { label:'Semester', value: `${user.semester}${user.semester===1?'st':user.semester===2?'nd':user.semester===3?'rd':'th'}` },
+              { label:'Section', value: user.section },
+              { label:'Enrollment Year', value: user.enrollmentYear },
+              { label:'Email', value: user.email },
+              { label:'Phone', value: user.phone },
+              { label:'Date of Birth', value: user.dob ? formatDate(user.dob) : 'Not provided' },
+            ].map(i => `
+            <div class="profile-info-item">
+              <div class="profile-info-label">${i.label}</div>
+              <div class="profile-info-value">${i.value}</div>
+            </div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card section-mb">
+          <div class="card-header"><div class="card-title">📊 Academic Summary</div></div>
+          <div class="card-body">
+            <div class="cgpa-display" style="padding:1.25rem;">
+              <div class="cgpa-number">${cgpa}</div>
+              <div class="cgpa-label">CGPA (${results.filter(r=>r.sgpa).length} semesters)</div>
+            </div>
+            <div class="grid-2" style="gap:0.75rem;margin-top:1rem;">
+              <div class="stat-card" style="flex-direction:column;text-align:center;">
+                <div class="stat-card-value">${att.overall}%</div>
+                <div class="stat-card-label">Attendance</div>
+              </div>
+              <div class="stat-card" style="flex-direction:column;text-align:center;">
+                <div class="stat-card-value">${APP_DATA.events.filter(e=>e.registered.includes(user.id)).length}</div>
+                <div class="stat-card-label">Events Registered</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card section-mb">
+          <div class="card-header"><div class="card-title">🏆 Achievements</div></div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:0.75rem;">
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;background:var(--success-light);border-radius:var(--radius-sm);">
+                <span style="font-size:1.25rem;">🥇</span><div><div style="font-weight:600;font-size:0.875rem;">Head – AI/ML Club</div><div style="font-size:0.75rem;color:var(--text-muted);">Academic Year 2026-27</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;background:var(--primary-50);border-radius:var(--radius-sm);">
+                <span style="font-size:1.25rem;">🏆</span><div><div style="font-weight:600;font-size:0.875rem;">1st Place – Internal Hackathon 2026</div><div style="font-size:0.75rem;color:var(--text-muted);">March 2026</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem;background:var(--warning-light);border-radius:var(--radius-sm);">
+                <span style="font-size:1.25rem;">⭐</span><div><div style="font-weight:600;font-size:0.875rem;">Merit Scholarship 2025</div><div style="font-size:0.75rem;color:var(--text-muted);">CGPA &gt; 8.5</div></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1865,430 +1977,412 @@ function renderStudentProfile() {
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// CLUBS
-// ─────────────────────────────────────────────────────────────
-function renderClubs() {
-  const clubs = APP_DATA.clubs;
-
+// ============================================================
+// FACULTY DIRECTORY
+// ============================================================
+function renderFacultyDirectory() {
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">🤝 Clubs & Societies</h1>
-      <p class="page-subtitle">Join a club and make your campus life memorable</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">👨‍🏫 Faculty Directory</div>
+        <div class="page-subtitle">Find and connect with faculty members</div>
+      </div>
     </div>
+    <div class="search-filter-bar">
+      <div class="search-bar">
+        <span class="search-bar-icon">🔍</span>
+        <input type="text" placeholder="Search by name, subject..." oninput="filterFaculty(this.value)">
+      </div>
+      <select class="filter-select" onchange="filterFacultyByDept(this.value)">
+        <option value="">All Departments</option>
+        ${APP_DATA.departments.map(d=>`<option value="${d.name}">${d.name}</option>`).join('')}
+      </select>
+    </div>
+    <div id="faculty-list" class="grid-auto">
+      ${renderFacultyCards(APP_DATA.faculty)}
+    </div>
+  </div>`;
+}
 
-    <div class="clubs-grid">
-      ${clubs.map(c => `
-      <div class="club-card" style="border-top:3px solid ${c.color}">
-        <div class="club-card-header">
-          <div class="club-icon-circle" style="background:${c.color}20;color:${c.color}">${c.icon}</div>
-          <div>
-            <div class="club-name">${c.name}</div>
-            <span class="badge badge-secondary">${c.category}</span>
-          </div>
-          ${c.isJoined ? '<span class="badge badge-success">Joined ✓</span>' : ''}
+function renderFacultyCards(faculty) {
+  return faculty.map(f => `
+  <div class="faculty-card">
+    <div class="faculty-avatar">${f.name[4] || f.name[0]}</div>
+    <div class="faculty-name">${f.name}</div>
+    <div class="faculty-designation">${f.designation}</div>
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.75rem;">${f.department}</div>
+    <div class="faculty-subjects">
+      ${f.subjects.map(s=>`<span class="badge badge-secondary">${s}</span>`).join('')}
+    </div>
+    <div class="faculty-contact">
+      <div>✉️ ${f.email}</div>
+      <div>🚪 Room: ${f.room}</div>
+      <div>🕐 ${f.officeHours}</div>
+      <div>🎓 ${f.qualification}</div>
+    </div>
+  </div>`).join('');
+}
+
+function filterFaculty(q) {
+  const filtered = q ? APP_DATA.faculty.filter(f =>
+    f.name.toLowerCase().includes(q.toLowerCase()) ||
+    f.subjects.some(s => s.toLowerCase().includes(q.toLowerCase()))
+  ) : APP_DATA.faculty;
+  document.getElementById('faculty-list').innerHTML = renderFacultyCards(filtered);
+}
+
+function filterFacultyByDept(dept) {
+  const filtered = dept ? APP_DATA.faculty.filter(f => f.department === dept) : APP_DATA.faculty;
+  document.getElementById('faculty-list').innerHTML = renderFacultyCards(filtered);
+}
+
+// ============================================================
+// CLUBS
+// ============================================================
+function renderClubs() {
+  return `
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">🤝 College Clubs</div>
+        <div class="page-subtitle">Join clubs, explore activities, and build your skills</div>
+      </div>
+    </div>
+    <div class="grid-auto">
+      ${APP_DATA.clubs.map(c => `
+      <div class="club-card">
+        <div class="club-icon">${c.icon}</div>
+        <div class="club-name">${c.name}</div>
+        <div class="club-desc">${c.desc || c.description}</div>
+        <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+          <div>👨‍🏫 Coordinator: ${c.coordinator}</div>
+          <div>🎓 Student Head: ${c.studentHead}</div>
+          <div>👥 ${c.members} members</div>
         </div>
-        <p class="club-desc">${c.description}</p>
-        <div class="club-meta">
-          <div class="club-meta-item"><span>👥</span><span>${c.members} members</span></div>
-          <div class="club-meta-item"><span>🏛️</span><span>Since ${c.founded}</span></div>
-          <div class="club-meta-item"><span>👑</span><span>${c.lead}</span></div>
-          <div class="club-meta-item"><span>👨‍🏫</span><span>${c.faculty}</span></div>
-          <div class="club-meta-item"><span>📅</span><span>${c.meetingSchedule}</span></div>
-          <div class="club-meta-item"><span>✉️</span><span>${c.email}</span></div>
+        <div style="background:var(--primary-50);border-radius:var(--radius-sm);padding:0.5rem 0.75rem;font-size:0.8125rem;color:var(--primary);margin-bottom:0.875rem;">
+          📅 Next: ${c.upcomingActivity}
         </div>
-        ${c.achievements.length > 0 ? `
-        <div class="club-achievements">
-          <div class="club-ach-title">🏆 Achievements</div>
-          ${c.achievements.map(a => `<div class="club-ach-item">• ${a}</div>`).join('')}
-        </div>` : ''}
-        <button class="btn ${c.isJoined ? 'btn-outline' : 'btn-primary'} btn-full mt-3"
-          onclick="toggleClub('${c.id}', this)">
-          ${c.isJoined ? 'Leave Club' : 'Join Club'}
-        </button>
+        <button class="btn btn-primary btn-sm btn-full" onclick="showToast('Joining ${c.name}... Check your email for confirmation!','success')">Join Club</button>
       </div>`).join('')}
     </div>
   </div>`;
 }
 
-function toggleClub(clubId, btn) {
-  const club = APP_DATA.clubs.find(c => c.id === clubId);
-  if (!club) return;
-  club.isJoined = !club.isJoined;
-  club.members += club.isJoined ? 1 : -1;
-  btn.textContent = club.isJoined ? 'Leave Club' : 'Join Club';
-  btn.className = `btn ${club.isJoined ? 'btn-outline' : 'btn-primary'} btn-full mt-3`;
-  showToast(club.isJoined ? `Joined ${club.name}! 🎉` : `Left ${club.name}.`, club.isJoined ? 'success' : 'info');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // PLACEMENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderPlacements() {
   const user = APP_STATE.currentUser;
-  const student = APP_DATA.students.find(s => s.id === user.id) || {};
-  const placements = APP_DATA.placements;
-  const stats = APP_DATA.adminStats.placementStats2024;
+  const userDeptId = APP_DATA.departments.find(d => d.name === user.department)?.id || 'CSE';
+  const userCGPA = user.cgpa || calculateCGPA(APP_DATA.semesterResults[user.id] || []);
+  const userSem = user.semester;
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">💼 Placement Drives</h1>
-      <p class="page-subtitle">Upcoming & ongoing campus placements</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">💼 Placement & Career</div>
+        <div class="page-subtitle">Upcoming drives and career opportunities</div>
+      </div>
     </div>
 
-    <!-- Placement Stats -->
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">🎯</div><div class="stat-card-body"><div class="stat-card-value">${stats.placed}</div><div class="stat-card-label">Students Placed</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#10b981,#059669)">💰</div><div class="stat-card-body"><div class="stat-card-value">${stats.highestPackage}</div><div class="stat-card-label">Highest Package</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📊</div><div class="stat-card-body"><div class="stat-card-value">${stats.averagePackage}</div><div class="stat-card-label">Average Package</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">🏢</div><div class="stat-card-body"><div class="stat-card-value">${stats.companies}</div><div class="stat-card-label">Companies</div></div></div>
+    <div style="background:var(--info-light);border:1px solid var(--info);border-radius:var(--radius-md);padding:1rem;margin-bottom:1.5rem;font-size:0.875rem;">
+      Your profile: <strong>${userDeptId}</strong> · CGPA: <strong>${userCGPA}</strong> · Sem: <strong>${userSem}</strong> · Eligible companies are highlighted ✅
     </div>
 
-    <!-- Student Eligibility -->
-    <div class="info-box">
-      <span>📋</span>
-      <p>Your current CGPA is <strong>${student.cgpa || '–'}</strong> | Department: <strong>${user.department}</strong>. Companies you may be eligible for are marked below.</p>
-    </div>
-
-    <!-- Placement Cards -->
-    <div class="placement-grid">
-      ${placements.map(p => {
-        const eligible = student.cgpa >= p.eligibility.cgpa && p.eligibility.branches.includes(user.department);
+    <div style="display:grid;gap:1.25rem;">
+      ${APP_DATA.placements.map(p => {
+        const eligible = parseFloat(userCGPA) >= p.eligibility.minCGPA &&
+          p.eligibility.branches.includes(userDeptId) &&
+          userSem >= p.eligibility.minSemester;
         return `
-        <div class="placement-card ${eligible ? 'placement-eligible' : 'placement-ineligible'}">
-          <div class="placement-card-header">
-            <div class="placement-logo" style="background:${p.logoColor}20;color:${p.logoColor}">${p.logo}</div>
-            <div class="placement-company-info">
-              <div class="placement-company">${p.company}</div>
-              <div class="placement-role">${p.role}</div>
+        <div class="placement-card ${eligible ? 'border-success' : ''}" style="${eligible ? 'border-left:4px solid var(--success);' : ''}">
+          <div class="placement-header">
+            <div class="placement-logo">${p.emoji}</div>
+            <div style="flex:1;">
+              <div style="font-size:1.125rem;font-weight:800;">${p.company}</div>
+              <div style="font-size:0.875rem;color:var(--text-secondary);">${p.role}</div>
+              <div style="margin-top:0.25rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+                <span class="badge badge-success">${p.package}</span>
+                <span class="badge badge-secondary">${p.location}</span>
+                ${eligible ? '<span class="badge badge-success">✅ Eligible</span>' : '<span class="badge badge-secondary">Check eligibility</span>'}
+              </div>
             </div>
-            <div class="placement-package">${p.package}</div>
+            <button class="btn btn-primary btn-sm" onclick="showToast('Applied to ${p.company}! Check email for confirmation.','success')" ${!eligible ? 'disabled title="Check eligibility criteria"' : ''}>Apply</button>
           </div>
-          <div class="placement-status-row">
-            <span class="badge badge-${getStatusColor(p.status)}">${p.status.replace('-',' ')}</span>
-            ${eligible ? '<span class="badge badge-success">✓ Eligible</span>' : '<span class="badge badge-danger">✗ Not Eligible</span>'}
-            <span class="text-muted text-sm">${p.registeredCount} registered</span>
+          <div class="placement-body">
+            <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:0.75rem;">${p.description}</p>
+            <div class="placement-skills">
+              ${p.skills.map(s=>`<span class="badge badge-secondary">${s}</span>`).join('')}
+            </div>
+            <div style="margin-top:0.75rem;font-size:0.8125rem;color:var(--text-muted);display:flex;gap:1.5rem;flex-wrap:wrap;">
+              <span>📅 Drive: ${formatDateShort(p.driveDate)}</span>
+              <span>⏰ Apply by: ${formatDateShort(p.deadline)}</span>
+              <span>📋 Min CGPA: ${p.eligibility.minCGPA}</span>
+            </div>
+            <div style="margin-top:0.5rem;font-size:0.8125rem;color:var(--text-muted);">
+              Rounds: ${p.rounds.join(' → ')}
+            </div>
           </div>
-          <p class="placement-desc">${p.description.substring(0, 130)}…</p>
-          <div class="placement-details">
-            <div class="placement-detail"><span>📅 Drive:</span><span>${formatDate(p.driveDate)}</span></div>
-            <div class="placement-detail"><span>⏰ Deadline:</span><span>${formatDate(p.applicationDeadline)}</span></div>
-            <div class="placement-detail"><span>🎓 Min CGPA:</span><span>${p.eligibility.cgpa}</span></div>
-            <div class="placement-detail"><span>🏛️ Branches:</span><span>${p.eligibility.branches.join(', ')}</span></div>
-          </div>
-          <div class="placement-rounds">
-            <strong>Rounds:</strong> ${p.rounds.map((r, i) => `<span class="round-badge">${i+1}. ${r}</span>`).join('')}
-          </div>
-          ${eligible && p.status === 'upcoming' ? `<button class="btn btn-primary btn-full mt-3" onclick="showToast('Applied for ${p.company}! Good luck! 🍀', 'success')">Apply Now →</button>` :
-            p.status === 'completed' ? `<button class="btn btn-ghost btn-full mt-3" disabled>Drive Completed</button>` :
-            !eligible ? `<button class="btn btn-ghost btn-full mt-3" disabled>Not Eligible</button>` :
-            `<button class="btn btn-outline btn-full mt-3" onclick="showToast('Viewing drive details for ${p.company}', 'info')">View Details</button>`}
         </div>`;
       }).join('')}
     </div>
 
-    <!-- Resources -->
-    <div class="section-card mt-4">
-      <h2 class="section-card-title">📚 Placement Resources</h2>
-      <div class="resources-grid">
-        <div class="resource-card" onclick="showToast('Opening placement resources...', 'info')">
-          <div class="resource-card-icon">🧮</div>
-          <div class="resource-card-body"><h3 class="resource-title">Aptitude Practice</h3><div class="resource-meta">Daily aptitude problems with solutions</div></div>
-          <button class="btn btn-primary btn-sm">Practice</button>
-        </div>
-        <div class="resource-card" onclick="showToast('Opening interview guide...', 'info')">
-          <div class="resource-card-icon">🎤</div>
-          <div class="resource-card-body"><h3 class="resource-title">Interview Tips</h3><div class="resource-meta">HR & Technical interview preparation</div></div>
-          <button class="btn btn-primary btn-sm">Read Guide</button>
-        </div>
-        <div class="resource-card" onclick="showToast('Opening DSA sheet...', 'info')">
-          <div class="resource-card-icon">💻</div>
-          <div class="resource-card-body"><h3 class="resource-title">DSA Practice Sheet</h3><div class="resource-meta">Top 300 DSA problems for placements</div></div>
-          <button class="btn btn-primary btn-sm">Start Practice</button>
+    <div class="card" style="margin-top:1.5rem;">
+      <div class="card-header"><div class="card-title">📚 Placement Preparation Resources</div></div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:0.75rem;">
+          ${['📖 DS & Algorithms Cheat Sheet','🧮 Aptitude Formula Book','💬 HR Interview Questions Guide','🖥 System Design Primer','🔢 SQL & Database Practice','📝 Resume Writing Tips'].map(r=>`
+          <div style="display:flex;align-items:center;gap:0.625rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius-sm);font-size:0.875rem;cursor:pointer;" onclick="showToast('Downloading resource...','success')">${r}</div>`).join('')}
         </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // NOTIFICATIONS PAGE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderNotificationsPage() {
   const notifs = APP_STATE.notifications;
-  const filter = APP_STATE.notifFilter || 'all';
-  const typeIcons = { assignment:'📝', notice:'📰', event:'🎉', leave:'📋', attendance:'📅' };
-
-  const filtered = filter === 'all' ? notifs : filter === 'unread' ? notifs.filter(n => !n.isRead) : notifs.filter(n => n.type === filter);
+  const unread = notifs.filter(n => !n.read).length;
 
   return `
-  <div class="page-content">
-    <div class="page-header-row">
+  <div>
+    <div class="page-header-row mb-6">
       <div class="page-header">
-        <h1 class="page-title">🔔 Notifications</h1>
-        <p class="page-subtitle">${notifs.filter(n=>!n.isRead).length} unread notification${notifs.filter(n=>!n.isRead).length !== 1 ? 's' : ''}</p>
+        <div class="page-title">🔔 Notifications</div>
+        <div class="page-subtitle">${unread} unread notification${unread !== 1 ? 's' : ''}</div>
       </div>
-      <button class="btn btn-outline" onclick="markAllRead()">✅ Mark All Read</button>
+      <button class="btn btn-secondary" onclick="markAllRead()">✅ Mark All as Read</button>
     </div>
 
-    <div class="filter-tabs">
-      ${[['all','All'],['unread','Unread'],['assignment','Assignments'],['event','Events'],['notice','Notices'],['attendance','Attendance']].map(([val,lbl]) => `
-      <button class="filter-tab ${filter === val ? 'active' : ''}" onclick="APP_STATE.notifFilter='${val}'; navigate('notifications')">
-        ${lbl}
-      </button>`).join('')}
+    <div class="pill-tabs">
+      <button class="pill-tab active" onclick="filterNotifsByType('all',this)">All (${notifs.length})</button>
+      <button class="pill-tab" onclick="filterNotifsByType('unread',this)">Unread (${unread})</button>
+      <button class="pill-tab" onclick="filterNotifsByType('assignment',this)">Assignments</button>
+      <button class="pill-tab" onclick="filterNotifsByType('event',this)">Events</button>
+      <button class="pill-tab" onclick="filterNotifsByType('notice',this)">Notices</button>
+      <button class="pill-tab" onclick="filterNotifsByType('attendance',this)">Attendance</button>
     </div>
 
-    <div class="notifications-list">
-      ${filtered.length === 0 ? '<div class="empty-state-card">No notifications.</div>' :
-        filtered.map(n => `
-        <div class="notif-item ${!n.isRead ? 'notif-unread' : ''}" onclick="markNotifRead('${n.id}')">
-          <div class="notif-icon">${typeIcons[n.type] || '🔔'}</div>
-          <div class="notif-body">
-            <div class="notif-title">${n.title}</div>
-            <div class="notif-message">${n.message}</div>
-            <div class="notif-time text-muted text-sm">${formatDateTime(n.timestamp)}</div>
-          </div>
-          ${!n.isRead ? '<div class="notif-dot"></div>' : ''}
-        </div>`).join('')}
+    <div id="notifs-list" class="card">
+      ${renderNotifItems(notifs)}
     </div>
   </div>`;
 }
 
-function markAllRead() {
-  APP_STATE.notifications.forEach(n => n.isRead = true);
-  showToast('All notifications marked as read.', 'success');
-  navigate('notifications');
+function renderNotifItems(notifs) {
+  if (!notifs.length) return `<div class="empty-state"><div class="empty-state-icon">🔔</div><div class="empty-state-title">No notifications</div><div class="empty-state-desc">You're all caught up!</div></div>`;
+  return notifs.map(n => `
+  <div class="notification-item ${!n.read ? 'unread' : ''}" onclick="markNotifRead('${n.id}')">
+    <div class="notification-icon">${n.icon || '🔔'}</div>
+    <div style="flex:1;min-width:0;">
+      <div class="notification-title">${n.title} ${!n.read ? '<span style="width:6px;height:6px;background:var(--primary);border-radius:50%;display:inline-block;vertical-align:middle;margin-left:4px;"></span>' : ''}</div>
+      <div class="notification-message">${n.message}</div>
+    </div>
+    <div class="notification-time">${n.time}</div>
+  </div>`).join('');
+}
+
+function filterNotifsByType(type, btn) {
+  document.querySelectorAll('.pill-tabs .pill-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  let filtered = APP_STATE.notifications;
+  if (type === 'unread') filtered = filtered.filter(n => !n.read);
+  else if (type !== 'all') filtered = filtered.filter(n => n.type === type);
+  document.getElementById('notifs-list').innerHTML = renderNotifItems(filtered);
 }
 
 function markNotifRead(id) {
   const n = APP_STATE.notifications.find(n => n.id === id);
-  if (n) n.isRead = true;
+  const dn = APP_DATA.notifications.find(n => n.id === id);
+  if (n) n.read = true;
+  if (dn) dn.read = true;
   navigate('notifications');
 }
 
-function formatDateTime(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }) + ' ' +
-    d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY DASHBOARD
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyDashboard() {
   const user = APP_STATE.currentUser;
+  const todayDay = getDayName();
   const tt = APP_DATA.timetable[user.id] || {};
-  const todayClasses = tt['Monday'] || [];
-  const pendingLeaves = APP_DATA.leaveApplications['STU1001'] ? APP_DATA.leaveApplications['STU1001'].filter(l => l.status === 'pending') : [];
-  const pendingAssignments = APP_DATA.assignments.filter(a => a.status === 'pending');
+  const todayClasses = (tt[todayDay] || tt['Monday'] || []);
+  const pendingLeaves = APP_DATA.leaveApplications.filter(l => l.status === 'pending');
 
   return `
-  <div class="page-content">
+  <div>
     <div class="welcome-banner">
-      <div class="welcome-text">
-        <h1 class="welcome-heading">${getGreeting()}, ${user.name.split(' ')[0]}! 👋</h1>
-        <p class="welcome-subtitle">${user.designation || 'Faculty'} • ${user.department} Department</p>
-      </div>
-      <div class="welcome-info-card">
-        <div class="info-chip">🆔 ${user.id}</div>
-        <div class="info-chip">🏛️ ${user.department}</div>
-        <div class="info-chip">📧 ${user.email || 'N/A'}</div>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">⏰</div>
-        <div class="stat-card-body"><div class="stat-card-value">${todayClasses.length}</div><div class="stat-card-label">Today's Classes</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#10b981,#059669)">📚</div>
-        <div class="stat-card-body"><div class="stat-card-value">3</div><div class="stat-card-label">Assigned Subjects</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">👨‍🎓</div>
-        <div class="stat-card-body"><div class="stat-card-value">8</div><div class="stat-card-label">Total Students</div></div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-card-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626)">📋</div>
-        <div class="stat-card-body"><div class="stat-card-value">${pendingLeaves.length}</div><div class="stat-card-label">Pending Requests</div></div>
+      <div class="welcome-content">
+        <div>
+          <div class="welcome-title">${getGreeting()}, ${user.name}! 👋</div>
+          <div class="welcome-subtitle">${user.designation} | ${user.department} | ID: ${user.id}</div>
+        </div>
+        <div class="welcome-stats">
+          <div class="welcome-stat"><div class="welcome-stat-value">${todayClasses.length}</div><div class="welcome-stat-label">Today's Classes</div></div>
+          <div class="welcome-stat"><div class="welcome-stat-value">${user.subjects ? user.subjects.length : 3}</div><div class="welcome-stat-label">Subjects</div></div>
+          <div class="welcome-stat"><div class="welcome-stat-value">${pendingLeaves.length}</div><div class="welcome-stat-label">Leave Requests</div></div>
+        </div>
       </div>
     </div>
 
     <!-- Quick Actions -->
-    <div class="section-card">
-      <h2 class="section-card-title">⚡ Quick Actions</h2>
+    <div class="section-mb">
       <div class="quick-actions-grid">
-        <button class="quick-action" onclick="navigate('faculty-attendance')"><span class="qa-icon">✅</span><span class="qa-label">Mark Attendance</span></button>
-        <button class="quick-action" onclick="navigate('faculty-assignments')"><span class="qa-icon">📝</span><span class="qa-label">Create Assignment</span></button>
-        <button class="quick-action" onclick="navigate('student-resources')"><span class="qa-icon">💾</span><span class="qa-label">Upload Material</span></button>
-        <button class="quick-action" onclick="navigate('faculty-marks')"><span class="qa-icon">📊</span><span class="qa-label">Enter Marks</span></button>
-        <button class="quick-action" onclick="navigate('faculty-students')"><span class="qa-icon">👨‍🎓</span><span class="qa-label">View Students</span></button>
-        <button class="quick-action" onclick="navigate('faculty-notices')"><span class="qa-icon">📰</span><span class="qa-label">Post Notice</span></button>
+        ${[
+          { icon:'📅', label:'Mark Attendance', page:'faculty-attendance', color:'var(--success-light)' },
+          { icon:'📝', label:'Create Assignment', page:'faculty-assignments', color:'var(--warning-light)' },
+          { icon:'💾', label:'Upload Material', page:'faculty-assignments', color:'var(--info-light)' },
+          { icon:'📊', label:'Enter Marks', page:'faculty-marks', color:'var(--primary-50)' },
+          { icon:'👨‍🎓', label:'View Students', page:'faculty-students', color:'var(--teal-light)' },
+          { icon:'📢', label:'Post Notice', page:'faculty-notices', color:'var(--danger-light)' },
+          { icon:'📋', label:'Leave Requests', page:'faculty-leave-requests', color:'var(--purple-light)', badge: pendingLeaves.length || null },
+          { icon:'🔔', label:'Notifications', page:'notifications', color:'var(--primary-50)' },
+        ].map(qa => `
+          <div class="quick-action-card" onclick="navigate('${qa.page}')">
+            <div class="quick-action-icon" style="background:${qa.color}">
+              ${qa.icon}
+              ${qa.badge ? `<span class="quick-action-badge">${qa.badge}</span>` : ''}
+            </div>
+            <div class="quick-action-label">${qa.label}</div>
+          </div>`).join('')}
       </div>
     </div>
 
-    <div class="dashboard-grid">
-      <!-- Today's Schedule -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">⏰ Today's Schedule</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('faculty-timetable')">View Full →</button>
-        </div>
-        <div class="today-classes">
-          ${todayClasses.length === 0 ? '<p class="empty-state">No classes today.</p>' :
+    <!-- Stats + Chart -->
+    <div class="stats-grid section-mb">
+      <div class="stat-card"><div class="stat-card-icon success">🎓</div><div><div class="stat-card-value">62</div><div class="stat-card-label">Total Students</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon primary">📚</div><div><div class="stat-card-value">${user.subjects ? user.subjects.length : 3}</div><div class="stat-card-label">Subjects Assigned</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon warning">📝</div><div><div class="stat-card-value">3</div><div class="stat-card-label">Pending Evaluations</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon danger">📋</div><div><div class="stat-card-value">${pendingLeaves.length}</div><div class="stat-card-label">Leave Requests</div></div></div>
+    </div>
+
+    <div class="two-col-layout section-mb">
+      <div class="card">
+        <div class="card-header"><div class="card-title">⏰ Today's Schedule (${todayDay})</div><button class="btn btn-ghost btn-sm" onclick="navigate('faculty-timetable')">Full →</button></div>
+        <div class="card-body" style="padding:0;">
+          ${todayClasses.length === 0 ? `<div class="empty-state" style="padding:2rem;"><div class="empty-state-icon">🎉</div><div class="empty-state-title">No classes today</div></div>` :
             todayClasses.map(c => `
-            <div class="today-class type-${c.type}">
-              <div class="class-time">${c.time}</div>
-              <div class="class-info">
-                <div class="class-subject">${c.subject}</div>
-                <div class="class-meta">${c.class || ''} • ${c.room}</div>
+            <div style="display:flex;align-items:center;gap:0.875rem;padding:0.875rem 1.25rem;border-bottom:1px solid var(--border-light);">
+              <div style="min-width:80px;font-size:0.75rem;color:var(--text-muted);font-weight:600;">${c.time}</div>
+              <div style="width:3px;height:40px;border-radius:99px;background:${c.type==='Lab'?'var(--teal)':'var(--primary)'}"></div>
+              <div style="flex:1;">
+                <div style="font-weight:700;font-size:0.875rem;">${c.subject}</div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);">${c.class || 'CSE-5A'} · ${c.room}</div>
               </div>
-              <span class="class-type-badge">${c.type}</span>
+              <button class="btn btn-primary btn-sm" onclick="navigate('faculty-attendance')">Mark</button>
             </div>`).join('')}
         </div>
       </div>
 
-      <!-- Student Performance Chart -->
-      <div class="section-card">
-        <h2 class="section-card-title">📊 Student Performance</h2>
-        <div class="chart-container" style="height:220px">
-          <canvas id="perfChart"></canvas>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 Class Performance</div></div>
+        <div class="card-body">
+          <div class="chart-wrapper-sm"><canvas id="perfChart"></canvas></div>
         </div>
       </div>
+    </div>
 
-      <!-- Pending Leave Requests -->
-      <div class="section-card">
-        <div class="section-card-header">
-          <h2 class="section-card-title">📋 Pending Leave Requests</h2>
-          <button class="btn btn-ghost btn-sm" onclick="navigate('faculty-leave-requests')">View All →</button>
-        </div>
-        ${pendingLeaves.length === 0 ? '<p class="empty-state">No pending requests.</p>' : `
-        <div class="leave-requests-list">
-          ${pendingLeaves.map(l => `
-          <div class="leave-request-item">
-            <div class="leave-request-info">
-              <div class="leave-request-name">${l.studentName || 'Aarav Patel'}</div>
-              <div class="leave-request-type">${l.type} • ${formatDate(l.fromDate)} – ${formatDate(l.toDate)}</div>
-              <div class="leave-request-reason text-muted text-sm">${l.reason.substring(0, 80)}…</div>
+    <!-- Pending Leave Requests -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Pending Leave Requests</div><button class="btn btn-ghost btn-sm" onclick="navigate('faculty-leave-requests')">View All →</button></div>
+      <div class="card-body" style="padding:0;">
+        ${pendingLeaves.length === 0 ? `<div class="empty-state" style="padding:1.5rem;"><div class="empty-state-icon">✅</div><div class="empty-state-title">No pending requests</div></div>` :
+          pendingLeaves.slice(0,3).map(l => `
+          <div style="display:flex;align-items:center;gap:1rem;padding:0.875rem 1.25rem;border-bottom:1px solid var(--border-light);flex-wrap:wrap;">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${l.studentName[0]}</div>
+            <div style="flex:1;min-width:150px;">
+              <div style="font-weight:700;font-size:0.875rem;">${l.studentName}</div>
+              <div style="font-size:0.75rem;color:var(--text-secondary);">${l.type} · ${formatDateShort(l.startDate)} to ${formatDateShort(l.endDate)}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">${l.reason.substring(0,60)}...</div>
             </div>
-            <div class="leave-request-actions">
+            <div style="display:flex;gap:0.5rem;">
               <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}')">✅ Approve</button>
               <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">❌ Reject</button>
             </div>
           </div>`).join('')}
-        </div>`}
-      </div>
-
-      <!-- Recent Notifications -->
-      <div class="section-card">
-        <h2 class="section-card-title">🔔 Notifications</h2>
-        <div class="notifications-list">
-          ${APP_DATA.notices.slice(0, 3).map(n => `
-          <div class="notif-item">
-            <div class="notif-icon">📰</div>
-            <div class="notif-body">
-              <div class="notif-title">${n.title}</div>
-              <div class="notif-time text-muted text-sm">${formatDate(n.date)}</div>
-            </div>
-          </div>`).join('')}
-        </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY ATTENDANCE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyAttendance() {
-  const students = APP_DATA.students;
-  const subjects = ['Artificial Intelligence', 'Deep Learning (Elective)'];
+  const user = APP_STATE.currentUser;
+  const students = APP_DATA.students.filter(s => s.department === user.department).slice(0, 8);
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📅 Mark Attendance</h1>
-      <p class="page-subtitle">Select subject and date to mark student attendance</p>
-    </div>
-
-    <div class="section-card">
-      <h2 class="section-card-title">Step 1: Select Subject & Date</h2>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Subject</label>
-          <select id="att-subject" class="form-select">
-            ${subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Date</label>
-          <input type="date" id="att-date" class="form-input" value="${new Date().toISOString().split('T')[0]}">
-        </div>
-        <div class="form-group" style="display:flex;align-items:flex-end">
-          <button class="btn btn-primary" onclick="loadAttendanceSheet()">Load Students</button>
-        </div>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header">
+        <div class="page-title">📅 Attendance Management</div>
+        <div class="page-subtitle">Mark and manage student attendance</div>
       </div>
     </div>
 
-    <div class="section-card" id="attendance-sheet-card" style="display:none">
-      <div class="section-card-header">
-        <h2 class="section-card-title">Step 2: Mark Attendance</h2>
-        <div style="display:flex;gap:8px">
+    <div class="card section-mb">
+      <div class="card-header"><div class="card-title">Mark Attendance</div></div>
+      <div class="card-body">
+        <div class="grid-3" style="gap:1rem;margin-bottom:1.25rem;">
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Subject *</label>
+            <select class="form-select">
+              ${(user.subjects || ['Machine Learning','Web Technologies','Algorithms']).map(s=>`<option>${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Class *</label>
+            <select class="form-select"><option>CSE-5A</option><option>CSE-5B</option><option>CSE-3A</option><option>CSE-4A</option></select>
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label">Date *</label>
+            <input type="date" class="form-input" value="${new Date().toISOString().split('T')[0]}">
+          </div>
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:1rem;">
           <button class="btn btn-success btn-sm" onclick="markAllAttendance(true)">✅ Mark All Present</button>
           <button class="btn btn-danger btn-sm" onclick="markAllAttendance(false)">❌ Mark All Absent</button>
         </div>
-      </div>
-      <div class="table-wrapper">
-        <table class="data-table" id="attendance-table">
-          <thead>
-            <tr>
-              <th>Roll No</th>
-              <th>Student Name</th>
-              <th>Department</th>
-              <th class="text-center">Present</th>
-              <th class="text-center">Absent</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${students.filter(s => s.department === 'CSE').map(s => `
-            <tr>
-              <td>${s.rollNo}</td>
-              <td>${s.name}</td>
-              <td>${s.department}</td>
-              <td class="text-center">
-                <input type="radio" name="att-${s.id}" value="present" checked class="att-radio" data-student="${s.id}">
-              </td>
-              <td class="text-center">
-                <input type="radio" name="att-${s.id}" value="absent" class="att-radio" data-student="${s.id}">
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-      <div class="mt-3">
-        <button class="btn btn-primary" onclick="submitAttendance()">📤 Submit Attendance</button>
-        <span class="text-muted ml-3 text-sm" id="att-summary"></span>
+        <div class="table-wrapper">
+          <table class="table" id="attendance-table">
+            <thead><tr><th>Roll No</th><th>Student Name</th><th>Department</th><th>Status</th></tr></thead>
+            <tbody>
+              ${students.map((s,i) => `
+              <tr>
+                <td style="font-weight:600;">CSE5A${String(i+1).padStart(2,'0')}</td>
+                <td>${s.name}</td>
+                <td style="font-size:0.8125rem;color:var(--text-secondary);">${s.department.split(' ')[0]}</td>
+                <td>
+                  <div style="display:flex;gap:0.5rem;">
+                    <button class="btn btn-sm btn-success attendance-btn" data-id="${s.id}" data-status="present" onclick="toggleAttendance(this)">P</button>
+                    <button class="btn btn-sm btn-ghost attendance-btn-absent" data-id="${s.id}" data-status="absent" onclick="toggleAttendance(this)">A</button>
+                  </div>
+                </td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div style="margin-top:1rem;text-align:right;">
+          <button class="btn btn-primary" onclick="submitAttendance()">💾 Save Attendance</button>
+        </div>
       </div>
     </div>
 
-    <!-- Past Attendance Sessions -->
-    <div class="section-card mt-4">
-      <h2 class="section-card-title">📊 Recent Attendance Sessions</h2>
+    <!-- Past Sessions -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📁 Recent Sessions</div></div>
       <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr><th>Date</th><th>Subject</th><th>Class</th><th>Present</th><th>Absent</th><th>%</th></tr>
-          </thead>
+        <table class="table">
+          <thead><tr><th>Date</th><th>Subject</th><th>Class</th><th>Present</th><th>Absent</th><th>%</th></tr></thead>
           <tbody>
-            <tr><td>Oct 20, 2024</td><td>Artificial Intelligence</td><td>CSE-SEM5-A</td><td>42</td><td>3</td><td><span class="badge badge-success">93.3%</span></td></tr>
-            <tr><td>Oct 19, 2024</td><td>Deep Learning</td><td>CSE-SEM7-A</td><td>38</td><td>2</td><td><span class="badge badge-success">95%</span></td></tr>
-            <tr><td>Oct 18, 2024</td><td>Artificial Intelligence</td><td>CSE-SEM5-B</td><td>40</td><td>5</td><td><span class="badge badge-warning">88.9%</span></td></tr>
-            <tr><td>Oct 17, 2024</td><td>AI Lab</td><td>CSE-SEM5-A</td><td>41</td><td>4</td><td><span class="badge badge-warning">91.1%</span></td></tr>
+            <tr><td>Sep 30</td><td>Machine Learning</td><td>CSE-5A</td><td>29</td><td>3</td><td><span class="badge badge-success">90.6%</span></td></tr>
+            <tr><td>Sep 30</td><td>Machine Learning</td><td>CSE-5B</td><td>27</td><td>5</td><td><span class="badge badge-warning">84.4%</span></td></tr>
+            <tr><td>Sep 28</td><td>Algorithms</td><td>CSE-4A</td><td>35</td><td>3</td><td><span class="badge badge-success">92.1%</span></td></tr>
           </tbody>
         </table>
       </div>
@@ -2296,555 +2390,337 @@ function renderFacultyAttendance() {
   </div>`;
 }
 
-function loadAttendanceSheet() {
-  document.getElementById('attendance-sheet-card').style.display = 'block';
-  updateAttSummary();
-  showToast('Students loaded for attendance marking.', 'info');
-}
-
 function markAllAttendance(present) {
-  document.querySelectorAll('.att-radio').forEach(r => {
-    if (r.value === (present ? 'present' : 'absent')) r.checked = true;
+  document.querySelectorAll('.attendance-btn').forEach(btn => {
+    btn.className = present ? 'btn btn-sm btn-success attendance-btn' : 'btn btn-sm btn-ghost attendance-btn';
   });
-  updateAttSummary();
+  showToast(`All students marked as ${present ? 'Present' : 'Absent'}`, 'info');
 }
 
-function updateAttSummary() {
-  const radios = document.querySelectorAll('.att-radio[value="present"]:checked');
-  const total = document.querySelectorAll('.att-radio[value="present"]').length;
-  const el = document.getElementById('att-summary');
-  if (el) el.textContent = `${radios.length} present, ${total - radios.length} absent`;
+function toggleAttendance(btn) {
+  // Toggle present/absent
+  const row = btn.closest('tr');
+  const pBtn = row.querySelector('[data-status="present"]');
+  const aBtn = row.querySelector('[data-status="absent"]');
+  if (pBtn && aBtn) {
+    pBtn.className = 'btn btn-sm btn-ghost attendance-btn';
+    aBtn.className = 'btn btn-sm btn-ghost attendance-btn-absent';
+    btn.className = btn.dataset.status === 'present' ? 'btn btn-sm btn-success attendance-btn' : 'btn btn-sm btn-danger attendance-btn-absent';
+  }
 }
 
 function submitAttendance() {
-  const subject = document.getElementById('att-subject')?.value;
-  const date = document.getElementById('att-date')?.value;
-  showToast(`Attendance submitted for ${subject} on ${formatDate(date)}!`, 'success');
-  document.getElementById('attendance-sheet-card').style.display = 'none';
+  showToast('Attendance saved successfully!', 'success');
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY ASSIGNMENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyAssignments() {
-  const assignments = APP_DATA.assignments.filter(a => a.faculty === 'Dr. Neha Sharma');
+  const user = APP_STATE.currentUser;
 
   return `
-  <div class="page-content">
-    <div class="page-header-row">
+  <div>
+    <div class="page-header-row mb-6">
       <div class="page-header">
-        <h1 class="page-title">📝 Assignments</h1>
-        <p class="page-subtitle">Manage assignments for your subjects</p>
+        <div class="page-title">📝 Assignment Management</div>
       </div>
       <button class="btn btn-primary" onclick="openCreateAssignmentModal()">+ Create Assignment</button>
     </div>
-
-    <div class="assignments-list">
-      ${assignments.length === 0 ? '<div class="empty-state-card">No assignments created yet.</div>' :
-        assignments.map(a => `
-        <div class="assignment-card">
-          <div class="assignment-card-header">
-            <div class="assignment-card-title-area">
-              <h3 class="assignment-card-title">${a.title}</h3>
-              <span class="badge badge-${getStatusColor(a.status)}">${a.status}</span>
+    <div style="display:grid;gap:1rem;">
+      ${APP_DATA.assignments.map(a => `
+      <div class="card">
+        <div class="card-body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.375rem;flex-wrap:wrap;">
+                <span class="badge badge-primary">${a.subject}</span>
+                <span class="badge badge-${a.status === 'evaluated' ? 'success' : 'warning'}">${a.status}</span>
+              </div>
+              <div style="font-weight:700;font-size:0.9375rem;">${a.title}</div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);margin-top:0.25rem;">${a.description.substring(0,120)}...</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">
+                Due: ${formatDate(a.dueDate)} · Max: ${a.maxMarks} marks · ${a.submissionsCount}/${a.totalStudents} submissions
+              </div>
             </div>
-            <div class="assignment-card-meta">
-              <span class="assignment-subject">${a.subject} (${a.subjectCode})</span>
-              <span>Max Marks: ${a.maxMarks}</span>
-            </div>
-          </div>
-          <p class="assignment-card-desc">${a.description.substring(0, 150)}…</p>
-          <div class="assignment-card-footer">
-            <div class="assignment-dates">
-              <span>📅 Assigned: ${formatDate(a.assignedDate)}</span>
-              <span>⏰ Due: ${formatDate(a.dueDate)}</span>
-              ${a.submittedDate ? `<span class="text-success">Submitted: ${formatDate(a.submittedDate)}</span>` : ''}
-            </div>
-            <div style="display:flex;gap:8px">
-              ${a.status === 'submitted' || a.status === 'late' ? `<button class="btn btn-primary btn-sm" onclick="showToast('Opening submission for evaluation...', 'info')">📋 Evaluate</button>` : ''}
-              <button class="btn btn-ghost btn-sm" onclick="showToast('View submissions coming soon.', 'info')">👁️ Submissions</button>
+            <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+              <button class="btn btn-secondary btn-sm" onclick="showToast('Viewing submissions...','info')">View Submissions</button>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Opening marks entry...','info')">Enter Marks</button>
             </div>
           </div>
-        </div>`).join('')}
+          <div class="progress-container" style="margin-top:0.875rem;">
+            <div class="progress-header">
+              <span style="font-size:0.75rem;color:var(--text-muted);">Submissions</span>
+              <span style="font-size:0.75rem;font-weight:600;">${a.submissionsCount}/${a.totalStudents}</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill success" style="width:${(a.submissionsCount/a.totalStudents)*100}%"></div></div>
+          </div>
+        </div>
+      </div>`).join('')}
     </div>
   </div>`;
 }
 
 function openCreateAssignmentModal() {
   openModal(`
-  <div class="modal-inner">
-    <div class="modal-header">
-      <h2>Create New Assignment</h2>
-      <button class="modal-close" onclick="closeModal(true)">✕</button>
+  <div class="modal-header"><div class="modal-title">📝 Create New Assignment</div><button class="modal-close" onclick="closeModal(true)">✕</button></div>
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Subject *</label>
+      <select class="form-select"><option>Machine Learning</option><option>Web Technologies</option><option>Computer Vision</option><option>Cloud Computing</option></select>
     </div>
-    <form onsubmit="createAssignment(event)">
-      <div class="form-group"><label class="form-label">Title *</label><input type="text" id="asn-title" class="form-input" required></div>
-      <div class="form-group"><label class="form-label">Subject *</label>
-        <select id="asn-subject" class="form-select" required>
-          <option value="Artificial Intelligence">Artificial Intelligence</option>
-          <option value="Deep Learning">Deep Learning</option>
-        </select>
-      </div>
-      <div class="form-group"><label class="form-label">Description *</label><textarea id="asn-desc" class="form-textarea" rows="4" required></textarea></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Due Date *</label><input type="date" id="asn-due" class="form-input" required></div>
-        <div class="form-group"><label class="form-label">Max Marks</label><input type="number" id="asn-marks" class="form-input" value="20"></div>
-      </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal(true)">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Assignment</button>
-      </div>
-    </form>
+    <div class="form-group"><label class="form-label">Title *</label><input type="text" class="form-input" placeholder="Assignment title"></div>
+    <div class="form-group"><label class="form-label">Description *</label><textarea class="form-input" rows="3" placeholder="Assignment instructions..."></textarea></div>
+    <div class="grid-2">
+      <div class="form-group"><label class="form-label">Due Date *</label><input type="date" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Max Marks</label><input type="number" class="form-input" value="20"></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal(true)">Cancel</button>
+    <button class="btn btn-primary" onclick="closeModal(true);showToast('Assignment created successfully!','success')">Create Assignment</button>
   </div>`);
 }
 
-function createAssignment(e) {
-  e.preventDefault();
-  const title = document.getElementById('asn-title').value;
-  const subject = document.getElementById('asn-subject').value;
-  const desc = document.getElementById('asn-desc').value;
-  const due = document.getElementById('asn-due').value;
-  const marks = parseInt(document.getElementById('asn-marks').value || '20');
-  if (!title || !due) { showToast('Fill all required fields.', 'error'); return; }
-  APP_DATA.assignments.push({
-    id: 'ASN' + Date.now(), title, subject, subjectCode: 'CS501',
-    faculty: APP_STATE.currentUser.name,
-    description: desc, assignedDate: new Date().toISOString().split('T')[0],
-    dueDate: due, submittedDate: null, status: 'pending',
-    maxMarks: marks, obtainedMarks: null, feedback: null, fileUrl: null, studentId: 'STU1001'
-  });
-  closeModal(true);
-  showToast('Assignment created successfully!', 'success');
-  navigate('faculty-assignments');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY STUDENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyStudents() {
-  const students = APP_DATA.students;
-
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">👨‍🎓 My Students</h1>
-      <p class="page-subtitle">Student performance overview for your classes</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">👨‍🎓 My Students</div><div class="page-subtitle">CSE-5A and CSE-5B students</div></div>
     </div>
-
-    <div class="filter-bar">
-      <input type="text" class="form-input" placeholder="Search students..." oninput="filterStudentTable(this.value)" style="max-width:300px">
-      <select class="form-select" onchange="filterStudentByDept(this.value)">
-        <option value="">All Departments</option>
-        ${[...new Set(students.map(s => s.department))].map(d => `<option value="${d}">${d}</option>`).join('')}
-      </select>
+    <div class="search-filter-bar">
+      <div class="search-bar"><span class="search-bar-icon">🔍</span><input type="text" placeholder="Search students..."></div>
+      <select class="filter-select"><option>All Classes</option><option>CSE-5A</option><option>CSE-5B</option></select>
     </div>
-
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table" id="students-table">
-          <thead>
-            <tr><th>Student ID</th><th>Name</th><th>Dept</th><th>Semester</th><th>CGPA</th><th>Attendance</th><th>Assignments</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            ${students.map(s => {
-              const att = APP_DATA.attendance[s.id]?.overall || 'N/A';
-              const asns = APP_DATA.assignments.filter(a => a.studentId === s.id);
-              const submitted = asns.filter(a => a.status === 'submitted' || a.status === 'evaluated' || a.status === 'late').length;
-              return `
-              <tr data-name="${s.name.toLowerCase()}" data-dept="${s.department}">
-                <td><code>${s.id}</code></td>
-                <td>${s.name}</td>
-                <td>${s.department}</td>
-                <td class="text-center">Sem ${s.semester}</td>
-                <td class="text-center"><span class="cgpa-chip">${s.cgpa}</span></td>
-                <td class="text-center"><span class="badge badge-${typeof att === 'number' && att >= 75 ? 'success' : 'danger'}">${att}${typeof att === 'number' ? '%' : ''}</span></td>
-                <td class="text-center">${submitted}/${asns.length}</td>
-                <td><button class="btn btn-ghost btn-sm" onclick="showToast('Student profile: ${s.name}', 'info')">View</button></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Sem</th><th>CGPA</th><th>Attendance</th><th>Status</th></tr></thead>
+        <tbody>
+          ${APP_DATA.students.map(s => `
+          <tr>
+            <td><code style="font-size:0.75rem;background:var(--bg-secondary);padding:0.125rem 0.375rem;border-radius:4px;">${s.id}</code></td>
+            <td style="font-weight:600;">${s.name}</td>
+            <td style="font-size:0.8125rem;">${s.department.split(' ')[0]}</td>
+            <td style="text-align:center;">${s.semester}</td>
+            <td style="text-align:center;font-weight:700;color:${s.cgpa>=8.5?'var(--success)':s.cgpa>=7?'var(--primary)':'var(--warning)'};">${s.cgpa}</td>
+            <td style="text-align:center;">${(75 + Math.random() * 20).toFixed(1)}%</td>
+            <td><span class="badge badge-${s.status==='active'?'success':'secondary'}">${s.status}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-function filterStudentTable(query) {
-  document.querySelectorAll('#students-table tbody tr').forEach(row => {
-    row.style.display = (row.dataset.name || '').includes(query.toLowerCase()) ? '' : 'none';
-  });
-}
-
-function filterStudentByDept(dept) {
-  document.querySelectorAll('#students-table tbody tr').forEach(row => {
-    row.style.display = !dept || row.dataset.dept === dept ? '' : 'none';
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY MARKS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyMarks() {
-  const students = APP_DATA.students.filter(s => s.department === 'CSE');
-  const subjects = ['Artificial Intelligence (CS501)', 'Deep Learning (CS510)'];
+  const user = APP_STATE.currentUser;
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📊 Marks Entry</h1>
-      <p class="page-subtitle">Enter internal assessment marks for students</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">📊 Marks Entry</div></div>
     </div>
-
-    <div class="section-card">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Subject</label>
-          <select id="marks-subject" class="form-select">
-            ${subjects.map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Assessment Type</label>
-          <select id="marks-type" class="form-select">
-            <option>Internal Assessment 1</option>
-            <option>Internal Assessment 2</option>
-            <option>Internal Assessment 3</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Max Marks</label>
-          <input type="number" id="marks-max" class="form-input" value="40">
+    <div class="card section-mb">
+      <div class="card-body">
+        <div class="grid-2" style="gap:1rem;margin-bottom:1rem;">
+          <div class="form-group" style="margin:0;"><label class="form-label">Subject</label>
+            <select class="form-select">${(user.subjects || ['Machine Learning']).map(s=>`<option>${s}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin:0;"><label class="form-label">Exam Type</label>
+            <select class="form-select"><option>Mid-Semester</option><option>Internal Assessment 1</option><option>Internal Assessment 2</option><option>End Semester</option></select>
+          </div>
         </div>
       </div>
     </div>
-
-    <div class="section-card">
-      <div class="section-card-header">
-        <h2 class="section-card-title">Enter Marks</h2>
-        <button class="btn btn-primary" onclick="saveMarks()">💾 Save Marks</button>
-      </div>
-      <div class="table-wrapper">
-        <table class="data-table" id="marks-table">
-          <thead><tr><th>Roll No</th><th>Student Name</th><th>Marks Obtained</th><th>Remarks</th></tr></thead>
-          <tbody>
-            ${students.map(s => {
-              const res = APP_DATA.semesterResults[s.id];
-              const sub = res && res.find(r => r.semester === 5)?.subjects?.[0];
-              const internal = sub ? sub.marksInternal : '';
-              return `
-              <tr>
-                <td>${s.rollNo}</td>
-                <td>${s.name}</td>
-                <td><input type="number" class="form-input marks-input" data-student="${s.id}" value="${internal}" min="0" max="40" style="width:80px"></td>
-                <td><input type="text" class="form-input" placeholder="Optional remarks" style="max-width:200px"></td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Roll No</th><th>Name</th><th>Internal Marks (/${APP_DATA.semesterResults.STU1001[4].subjects[0].maxMarks ? 50 : 50})</th><th>Status</th></tr></thead>
+        <tbody>
+          ${APP_DATA.students.slice(0,6).map((s,i) => {
+            const marks = Math.floor(30 + Math.random() * 20);
+            return `<tr>
+              <td style="font-weight:600;">CSE5A${String(i+1).padStart(2,'0')}</td>
+              <td>${s.name}</td>
+              <td><input type="number" class="form-input" value="${marks}" min="0" max="50" style="width:80px;height:36px;text-align:center;" onchange="showToast('Marks updated for ${s.name}','info')"></td>
+              <td><span class="badge badge-${marks>=40?'success':marks>=25?'warning':'danger'}">${marks>=40?'Pass':marks>=25?'Average':'Fail'}</span></td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:1rem;text-align:right;">
+      <button class="btn btn-primary" onclick="showToast('Marks saved successfully!','success')">💾 Save Marks</button>
     </div>
   </div>`;
 }
 
-function saveMarks() {
-  showToast('Marks saved successfully!', 'success');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // LEAVE REQUESTS (Faculty view)
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderLeaveRequests() {
-  const leaves = Object.values(APP_DATA.leaveApplications).flat();
-  const pending = leaves.filter(l => l.status === 'pending');
-  const history = leaves.filter(l => l.status !== 'pending');
+  const pending = APP_DATA.leaveApplications.filter(l => l.status === 'pending');
+  const others = APP_DATA.leaveApplications.filter(l => l.status !== 'pending');
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📋 Leave Requests</h1>
-      <p class="page-subtitle">Manage student leave applications</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">📋 Leave Requests</div><div class="page-subtitle">${pending.length} pending requests</div></div>
     </div>
 
-    <div class="section-card">
-      <h2 class="section-card-title">⏳ Pending Requests (${pending.length})</h2>
-      ${pending.length === 0 ? '<p class="empty-state">No pending leave requests.</p>' : `
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Student</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Applied</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${pending.map(l => `
-            <tr>
-              <td>${l.studentName || 'Aarav Patel'}</td>
-              <td><span class="badge badge-info">${l.type}</span></td>
-              <td>${formatDate(l.fromDate)}</td>
-              <td>${formatDate(l.toDate)}</td>
-              <td class="text-center">${l.days}</td>
-              <td class="text-sm">${l.reason.substring(0, 60)}…</td>
-              <td class="text-sm">${formatDate(l.appliedOn)}</td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}')">✅</button>
-                  <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">❌</button>
-                </div>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`}
+    <h3 style="font-size:0.875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.875rem;">⏳ Pending Approval</h3>
+    <div style="display:grid;gap:0.875rem;margin-bottom:1.5rem;">
+      ${pending.length === 0 ? `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">No pending requests</div></div>` :
+        pending.map(l => `
+        <div class="card">
+          <div class="card-body" style="display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;">
+            <div style="width:40px;height:40px;border-radius:50%;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">${l.studentName[0]}</div>
+            <div style="flex:1;min-width:180px;">
+              <div style="font-weight:700;">${l.studentName} <span class="badge badge-secondary">${l.studentId}</span></div>
+              <div style="font-size:0.8125rem;color:var(--text-secondary);margin:0.25rem 0;">${l.type} · ${formatDateShort(l.startDate)} → ${formatDateShort(l.endDate)}</div>
+              <div style="font-size:0.8125rem;color:var(--text-primary);">${l.reason}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Applied: ${formatDateShort(l.appliedDate)} ${l.document ? '· 📎 '+l.document : ''}</div>
+            </div>
+            <div style="display:flex;gap:0.5rem;flex-shrink:0;">
+              <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}')">✅ Approve</button>
+              <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">❌ Reject</button>
+            </div>
+          </div>
+        </div>`).join('')}
     </div>
 
-    <div class="section-card mt-4">
-      <h2 class="section-card-title">📂 History</h2>
-      ${history.length === 0 ? '<p class="empty-state">No history.</p>' : `
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Student</th><th>Type</th><th>Dates</th><th>Status</th><th>Reviewed By</th></tr></thead>
-          <tbody>
-            ${history.map(l => `
-            <tr>
-              <td>${l.studentName || 'Aarav Patel'}</td>
-              <td>${l.type}</td>
-              <td>${formatDate(l.fromDate)} – ${formatDate(l.toDate)}</td>
-              <td><span class="badge badge-${getStatusColor(l.status)}">${l.status}</span></td>
-              <td>${l.approvedBy || '–'}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`}
+    <h3 style="font-size:0.875rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.875rem;">📁 Past Requests</h3>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Student</th><th>Type</th><th>Dates</th><th>Status</th><th>Reviewed By</th></tr></thead>
+        <tbody>
+          ${others.map(l => `
+          <tr>
+            <td style="font-weight:600;">${l.studentName}</td>
+            <td><span class="badge badge-secondary">${l.type}</span></td>
+            <td style="font-size:0.8125rem;">${formatDateShort(l.startDate)} → ${formatDateShort(l.endDate)}</td>
+            <td><span class="badge badge-${getStatusColor(l.status)}">${getStatusLabel(l.status)}</span></td>
+            <td style="font-size:0.8125rem;color:var(--text-secondary);">${l.reviewedBy || '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-function approveLeave(leaveId) {
-  const leaves = Object.values(APP_DATA.leaveApplications).flat();
-  const leave = leaves.find(l => l.id === leaveId);
-  if (leave) {
-    leave.status = 'approved';
-    leave.approvedBy = APP_STATE.currentUser.name;
-    leave.approvedOn = new Date().toISOString().split('T')[0];
-  }
-  showToast('Leave application approved.', 'success');
-  navigate(APP_STATE.currentPage);
-}
-
-function rejectLeave(leaveId) {
-  const leaves = Object.values(APP_DATA.leaveApplications).flat();
-  const leave = leaves.find(l => l.id === leaveId);
-  if (leave) {
-    leave.status = 'rejected';
-    leave.approvedBy = APP_STATE.currentUser.name;
-    leave.approvedOn = new Date().toISOString().split('T')[0];
-  }
-  showToast('Leave application rejected.', 'warning');
-  navigate(APP_STATE.currentPage);
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // FACULTY TIMETABLE
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderFacultyTimetable() {
   const user = APP_STATE.currentUser;
   const tt = APP_DATA.timetable[user.id] || {};
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const todayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
-  const typeColors = { theory:'#4f46e5', lab:'#0891b2', tutorial:'#059669', meeting:'#7c3aed', 'office-hours':'#d97706' };
-
-  const allTimes = new Set();
-  days.forEach(d => (tt[d] || []).forEach(c => allTimes.add(c.time)));
-  const timeSlots = [...allTimes].sort();
+  const todayDay = getDayName();
+  const allTimes = ['9:00-10:00', '10:00-11:00', '11:00-12:00', '12:00-1:00', '2:00-4:00'];
 
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">⏰ My Timetable</h1>
-      <p class="page-subtitle">${user.name} – ${user.department} Faculty Schedule</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">⏰ My Timetable</div><div class="page-subtitle">${user.name} | ${user.designation}</div></div>
     </div>
-
-    <div class="tt-legend">
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#4f46e5"></span>Theory</div>
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#0891b2"></span>Lab</div>
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#7c3aed"></span>Meeting</div>
-      <div class="tt-legend-item"><span class="tt-legend-dot" style="background:#d97706"></span>Office Hours</div>
-    </div>
-
-    <div class="timetable-wrapper">
-      <div class="timetable-grid" style="grid-template-columns: 100px repeat(${days.length}, 1fr)">
-        <div class="tt-header-cell tt-time-header">Time</div>
-        ${days.map(d => `<div class="tt-header-cell ${d === todayName ? 'tt-today' : ''}">${d}${d === todayName ? ' <span class="today-tag">Today</span>' : ''}</div>`).join('')}
-        ${timeSlots.length === 0 ? `<div class="tt-time-cell">–</div>${days.map(() => `<div class="tt-cell tt-empty"></div>`).join('')}` :
-          timeSlots.map(time => `
-          <div class="tt-time-cell">${time.split('–')[0].trim()}</div>
-          ${days.map(d => {
-            const classes = (tt[d] || []).filter(c => c.time === time);
-            if (!classes.length) return `<div class="tt-cell tt-empty"></div>`;
-            return classes.map(c => `
-              <div class="tt-cell tt-class" style="border-left:3px solid ${typeColors[c.type]||'#94a3b8'};background:${typeColors[c.type]||'#94a3b8'}22">
-                <div class="tt-class-subject">${c.subject}</div>
-                <div class="tt-class-meta">${c.class || ''}</div>
-                <div class="tt-class-room">📍 ${c.room}</div>
-                <span class="tt-class-type" style="background:${typeColors[c.type]||'#94a3b8'}">${c.type}</span>
-              </div>`).join('');
-          }).join('')}`).join('')}
+    <div class="card">
+      <div class="card-body" style="overflow-x:auto;padding:1rem;">
+        <div style="display:grid;grid-template-columns:80px repeat(6,1fr);gap:0.5rem;min-width:700px;">
+          <div></div>
+          ${days.map(d => `<div class="timetable-header ${d === todayDay ? 'today' : ''}">${d.substring(0,3)}</div>`).join('')}
+          ${allTimes.map(time => `
+            <div class="timetable-time">${time}</div>
+            ${days.map(day => {
+              const cls = (tt[day] || []).find(c => c.time === time);
+              if (!cls) return '<div></div>';
+              return `<div class="timetable-class ${cls.type.toLowerCase()}">
+                <div class="timetable-subject">${cls.subject}</div>
+                <div class="timetable-meta">${cls.class || 'Class'}<br>${cls.room}</div>
+              </div>`;
+            }).join('')}
+          `).join('')}
+        </div>
       </div>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
-// FACULTY DIRECTORY
-// ─────────────────────────────────────────────────────────────
-function renderFacultyDirectory() {
-  const faculty = APP_DATA.facultyDirectory;
-
-  return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">🎓 Faculty Directory</h1>
-      <p class="page-subtitle">${APP_DATA.college.shortName} Faculty Members</p>
-    </div>
-
-    <div class="filter-bar">
-      <input type="text" class="form-input" placeholder="Search by name, subject..." oninput="filterFaculty(this.value)" style="max-width:300px">
-      <select class="form-select" onchange="filterFacultyByDept(this.value)">
-        <option value="">All Departments</option>
-        ${[...new Set(faculty.map(f => f.department))].map(d => `<option value="${d}">${d}</option>`).join('')}
-      </select>
-    </div>
-
-    <div class="faculty-dir-grid" id="faculty-dir-grid">
-      ${faculty.map(f => `
-      <div class="faculty-dir-card" data-name="${f.name.toLowerCase()} ${(f.subjects||[]).join(' ').toLowerCase()}" data-dept="${f.department}">
-        <div class="faculty-dir-avatar">${f.name.split(' ').pop()[0]}</div>
-        <div class="faculty-dir-body">
-          <div class="faculty-dir-name">${f.name}</div>
-          <div class="faculty-dir-desig">${f.designation}</div>
-          <span class="badge badge-primary">${f.department}</span>
-          <div class="faculty-dir-subjects">${(f.subjects || []).join(', ')}</div>
-          <div class="faculty-dir-info">
-            <div><span>✉️</span><a href="mailto:${f.email}">${f.email}</a></div>
-            <div><span>📞</span><span>${f.phone}</span></div>
-            <div><span>🚪</span><span>${f.cabin}</span></div>
-            <div><span>🕒</span><span>${f.officeHours}</span></div>
-          </div>
-          <div class="faculty-dir-meta text-muted text-sm">
-            <span>📚 ${f.publications} publications</span>
-            <span>⏳ ${f.experience} yrs exp</span>
-          </div>
-          ${(f.awards||[]).length > 0 ? `<div class="faculty-ach-list">${f.awards.map(a => `<div class="faculty-ach">🏆 ${a}</div>`).join('')}</div>` : ''}
-        </div>
-      </div>`).join('')}
-    </div>
-  </div>`;
-}
-
-function filterFaculty(query) {
-  document.querySelectorAll('.faculty-dir-card').forEach(card => {
-    card.style.display = (card.dataset.name || '').includes(query.toLowerCase()) ? '' : 'none';
-  });
-}
-
-function filterFacultyByDept(dept) {
-  document.querySelectorAll('.faculty-dir-card').forEach(card => {
-    card.style.display = !dept || card.dataset.dept === dept ? '' : 'none';
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN DASHBOARD
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminDashboard() {
   const stats = APP_DATA.adminStats;
-  const college = APP_DATA.college;
-  const leaves = Object.values(APP_DATA.leaveApplications).flat();
-  const pendingLeaves = leaves.filter(l => l.status === 'pending');
-  const complaints = Object.values(APP_DATA.complaints).flat();
 
   return `
-  <div class="page-content">
+  <div>
     <div class="welcome-banner">
-      <div class="welcome-text">
-        <h1 class="welcome-heading">${getGreeting()}, ${APP_STATE.currentUser.name.split(' ')[1]}! 👋</h1>
-        <p class="welcome-subtitle">Administration Dashboard – ${APP_DATA.college.shortName}</p>
-      </div>
-      <div class="welcome-info-card">
-        <div class="info-chip">📅 ${new Date().toLocaleDateString('en-IN', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+      <div class="welcome-content">
+        <div>
+          <div class="welcome-title">${getGreeting()}, ${APP_STATE.currentUser.name}! 🔑</div>
+          <div class="welcome-subtitle">College Administrator | ${APP_DATA.college.name}</div>
+        </div>
+        <div class="welcome-stats">
+          <div class="welcome-stat"><div class="welcome-stat-value">${stats.totalStudents.toLocaleString()}</div><div class="welcome-stat-label">Students</div></div>
+          <div class="welcome-stat"><div class="welcome-stat-value">${stats.totalFaculty}</div><div class="welcome-stat-label">Faculty</div></div>
+          <div class="welcome-stat"><div class="welcome-stat-value">${stats.pendingApplications}</div><div class="welcome-stat-label">Pending</div></div>
+        </div>
       </div>
     </div>
 
-    <!-- Stats Row -->
-    <div class="admin-stats-grid">
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">👨‍🎓</div><div class="stat-card-body"><div class="stat-card-value">${college.stats.totalStudents.toLocaleString()}</div><div class="stat-card-label">Total Students</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">👨‍🏫</div><div class="stat-card-body"><div class="stat-card-value">${college.stats.totalFaculty}</div><div class="stat-card-label">Faculty Members</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#10b981,#059669)">🏛️</div><div class="stat-card-body"><div class="stat-card-value">${college.stats.departments}</div><div class="stat-card-label">Departments</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">📊</div><div class="stat-card-body"><div class="stat-card-value">7.82</div><div class="stat-card-label">Avg CGPA</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">🎉</div><div class="stat-card-body"><div class="stat-card-value">${college.stats.upcomingEvents}</div><div class="stat-card-label">Active Events</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#ef4444,#dc2626)">📋</div><div class="stat-card-body"><div class="stat-card-value">${pendingLeaves.length + 2}</div><div class="stat-card-label">Pending Apps</div></div></div>
+    <!-- Stats Grid -->
+    <div class="stats-grid section-mb" style="grid-template-columns:repeat(3,1fr);">
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--primary-50);">👨‍🎓</div><div><div class="admin-stat-value">${stats.totalStudents.toLocaleString()}</div><div class="admin-stat-label">Total Students</div></div></div>
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--success-light);">👨‍🏫</div><div><div class="admin-stat-value">${stats.totalFaculty}</div><div class="admin-stat-label">Total Faculty</div></div></div>
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--warning-light);">🏛️</div><div><div class="admin-stat-value">${stats.departments}</div><div class="admin-stat-label">Departments</div></div></div>
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--info-light);">📊</div><div><div class="admin-stat-value">${stats.avgCGPA}</div><div class="admin-stat-label">Avg CGPA</div></div></div>
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--teal-light);">📅</div><div><div class="admin-stat-value">${stats.avgAttendance}%</div><div class="admin-stat-label">Avg Attendance</div></div></div>
+      <div class="admin-stat-card"><div class="admin-stat-icon" style="background:var(--danger-light);">📋</div><div><div class="admin-stat-value">${stats.pendingApplications}</div><div class="admin-stat-label">Pending Apps</div></div></div>
     </div>
 
     <!-- Charts -->
-    <div class="charts-row">
-      <div class="section-card" style="flex:1">
-        <h2 class="section-card-title">📊 Department-wise Avg CGPA</h2>
-        <div class="chart-container" style="height:260px"><canvas id="deptChart"></canvas></div>
+    <div class="two-col-layout section-mb">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 Department-wise Average CGPA</div></div>
+        <div class="card-body"><div class="chart-wrapper"><canvas id="deptChart"></canvas></div></div>
       </div>
-      <div class="section-card" style="flex:1">
-        <h2 class="section-card-title">📈 Monthly Attendance Trend</h2>
-        <div class="chart-container" style="height:260px"><canvas id="enrollChart"></canvas></div>
-      </div>
-    </div>
-
-    <!-- Pending Applications -->
-    <div class="section-card">
-      <div class="section-card-header">
-        <h2 class="section-card-title">📋 Pending Applications</h2>
-        <button class="btn btn-ghost btn-sm" onclick="navigate('admin-applications')">View All →</button>
-      </div>
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Type</th><th>Student</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${pendingLeaves.slice(0, 3).map(l => `
-            <tr>
-              <td><code>${l.id}</code></td>
-              <td>${l.type}</td>
-              <td>${l.studentName || 'Aarav Patel'}</td>
-              <td>${formatDate(l.appliedOn)}</td>
-              <td><span class="badge badge-warning">Pending</span></td>
-              <td>
-                <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}')">Approve</button>
-                <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">Reject</button>
-              </td>
-            </tr>`).join('')}
-            <tr><td><code>APP002</code></td><td>Library Extension</td><td>Aarav Patel</td><td>${formatDate('2024-10-10')}</td><td><span class="badge badge-warning">Pending</span></td><td><button class="btn btn-success btn-sm" onclick="showToast('Approved!','success')">Approve</button></td></tr>
-          </tbody>
-        </table>
+      <div class="card">
+        <div class="card-header"><div class="card-title">📈 Monthly Attendance Trend</div></div>
+        <div class="card-body"><div class="chart-wrapper"><canvas id="enrollChart"></canvas></div></div>
       </div>
     </div>
 
-    <!-- Quick Actions + Complaints -->
-    <div class="dashboard-grid">
-      <div class="section-card">
-        <h2 class="section-card-title">⚡ Quick Actions</h2>
-        <div class="quick-actions-grid">
-          <button class="quick-action" onclick="navigate('admin-students')"><span class="qa-icon">👨‍🎓</span><span class="qa-label">Manage Students</span></button>
-          <button class="quick-action" onclick="navigate('admin-faculty')"><span class="qa-icon">👨‍🏫</span><span class="qa-label">Manage Faculty</span></button>
-          <button class="quick-action" onclick="navigate('admin-events')"><span class="qa-icon">🎉</span><span class="qa-label">Add Event</span></button>
-          <button class="quick-action" onclick="navigate('admin-notices')"><span class="qa-icon">📰</span><span class="qa-label">Add Notice</span></button>
-          <button class="quick-action" onclick="navigate('admin-reports')"><span class="qa-icon">📊</span><span class="qa-label">Reports</span></button>
-          <button class="quick-action" onclick="navigate('admin-settings')"><span class="qa-icon">⚙️</span><span class="qa-label">Settings</span></button>
+    <!-- Quick Actions -->
+    <div class="two-col-layout section-mb">
+      <div class="card">
+        <div class="card-header"><div class="card-title">⚡ Quick Actions</div></div>
+        <div class="card-body">
+          <div class="grid-2" style="gap:0.75rem;">
+            ${[
+              { icon:'👨‍🎓', label:'Manage Students', page:'admin-students', color:'primary' },
+              { icon:'👨‍🏫', label:'Manage Faculty', page:'admin-faculty', color:'success' },
+              { icon:'🎉', label:'Add Event', page:'admin-events', color:'info' },
+              { icon:'📢', label:'Post Notice', page:'admin-notices', color:'warning' },
+              { icon:'📋', label:'Applications', page:'admin-applications', color:'purple' },
+              { icon:'📊', label:'Reports', page:'admin-reports', color:'secondary' },
+            ].map(a => `<button class="btn btn-outline-primary btn-full" style="justify-content:flex-start;gap:0.625rem;" onclick="navigate('${a.page}')">${a.icon} ${a.label}</button>`).join('')}
+          </div>
         </div>
       </div>
-      <div class="section-card">
-        <h2 class="section-card-title">📣 Recent Complaints</h2>
-        <div class="complaints-list">
-          ${complaints.slice(0, 4).map(c => `
-          <div class="complaint-item">
-            <div class="complaint-header">
-              <span class="badge badge-secondary">${c.category}</span>
-              <span class="badge badge-${getStatusColor(c.status)}">${c.status}</span>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">📋 Recent Applications</div><button class="btn btn-ghost btn-sm" onclick="navigate('admin-applications')">All →</button></div>
+        <div class="card-body" style="padding:0;">
+          ${APP_DATA.leaveApplications.slice(0,4).map(l => `
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1.25rem;border-bottom:1px solid var(--border-light);">
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:0.875rem;">${l.studentName}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">${l.type} · ${formatDateShort(l.startDate)}</div>
             </div>
-            <div class="complaint-subject">${c.subject}</div>
-            <div class="complaint-footer text-sm text-muted">${formatDate(c.submittedOn)}</div>
+            <span class="badge badge-${getStatusColor(l.status)}">${getStatusLabel(l.status)}</span>
           </div>`).join('')}
         </div>
       </div>
@@ -2852,600 +2728,382 @@ function renderAdminDashboard() {
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN STUDENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminStudents() {
-  const students = APP_DATA.students;
-
   return `
-  <div class="page-content">
-    <div class="page-header-row">
-      <div class="page-header">
-        <h1 class="page-title">👨‍🎓 Student Management</h1>
-        <p class="page-subtitle">${students.length} students found</p>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="showToast('Add student form coming soon.', 'info')">+ Add Student</button>
-        <button class="btn btn-outline" onclick="showToast('Exporting student data...', 'success')">📤 Export</button>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">👨‍🎓 Students Management</div><div class="page-subtitle">Total: ${APP_DATA.adminStats.totalStudents.toLocaleString()} students</div></div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="showToast('Export started...','info')">⬇ Export</button>
+        <button class="btn btn-primary" onclick="showToast('Add student feature coming soon.','info')">+ Add Student</button>
       </div>
     </div>
-
-    <div class="filter-bar">
-      <input type="text" class="form-input" placeholder="Search students..." oninput="filterAdminStudents(this.value)" style="max-width:280px">
-      <select class="form-select" onchange="filterStudentByDept(this.value)">
-        <option value="">All Departments</option>
-        ${[...new Set(students.map(s => s.department))].map(d => `<option value="${d}">${d}</option>`).join('')}
-      </select>
-      <select class="form-select">
-        <option value="">All Semesters</option>
-        ${[...new Set(students.map(s => s.semester))].sort().map(sem => `<option value="${sem}">Sem ${sem}</option>`).join('')}
-      </select>
+    <div class="search-filter-bar">
+      <div class="search-bar"><span class="search-bar-icon">🔍</span><input type="text" placeholder="Search students..."></div>
+      <select class="filter-select"><option value="">All Departments</option>${APP_DATA.departments.map(d=>`<option>${d.name}</option>`).join('')}</select>
+      <select class="filter-select"><option value="">All Semesters</option>${[1,2,3,4,5,6,7,8].map(s=>`<option>Semester ${s}</option>`).join('')}</select>
     </div>
-
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table" id="admin-students-table">
-          <thead>
-            <tr><th>Student ID</th><th>Name</th><th>Roll No</th><th>Department</th><th>Semester</th><th>CGPA</th><th>Batch</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            ${students.map(s => `
-            <tr data-name="${s.name.toLowerCase()}" data-dept="${s.department}">
-              <td><code>${s.id}</code></td>
-              <td>${s.name}</td>
-              <td>${s.rollNo}</td>
-              <td>${s.department}</td>
-              <td>Sem ${s.semester}</td>
-              <td><strong class="text-primary">${s.cgpa}</strong></td>
-              <td>${s.batch}</td>
-              <td><span class="badge badge-success">Active</span></td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Viewing ${s.name} profile...', 'info')">👁️ View</button>
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Edit ${s.name} coming soon.', 'info')">✏️ Edit</button>
-                </div>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Semester</th><th>Section</th><th>CGPA</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${APP_DATA.students.map(s => `
+          <tr>
+            <td><code style="font-size:0.75rem;background:var(--bg-secondary);padding:0.125rem 0.375rem;border-radius:4px;">${s.id}</code></td>
+            <td style="font-weight:600;">${s.name}</td>
+            <td style="font-size:0.8125rem;">${s.department}</td>
+            <td style="text-align:center;">${s.semester}</td>
+            <td style="text-align:center;">${s.section || 'A'}</td>
+            <td style="text-align:center;font-weight:700;color:${s.cgpa>=8.5?'var(--success)':s.cgpa>=7?'var(--primary)':'var(--warning)'};">${s.cgpa}</td>
+            <td><span class="badge badge-${s.status==='active'?'success':'secondary'}">${s.status}</span></td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost btn-sm" onclick="showToast('View profile for ${s.name}','info')">👁</button>
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Edit ${s.name}','info')">✏️</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-function filterAdminStudents(query) {
-  document.querySelectorAll('#admin-students-table tbody tr').forEach(row => {
-    row.style.display = (row.dataset.name || '').includes(query.toLowerCase()) ? '' : 'none';
-  });
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN FACULTY
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminFaculty() {
-  const faculty = APP_DATA.facultyDirectory;
-
   return `
-  <div class="page-content">
-    <div class="page-header-row">
-      <div class="page-header">
-        <h1 class="page-title">👨‍🏫 Faculty Management</h1>
-        <p class="page-subtitle">${faculty.length} faculty members</p>
-      </div>
-      <button class="btn btn-primary" onclick="showToast('Add faculty form coming soon.', 'info')">+ Add Faculty</button>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">👨‍🏫 Faculty Management</div></div>
+      <button class="btn btn-primary" onclick="showToast('Add faculty feature coming soon.','info')">+ Add Faculty</button>
     </div>
-
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Faculty ID</th><th>Name</th><th>Department</th><th>Designation</th><th>Subjects</th><th>Email</th><th>Publications</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${faculty.map(f => `
-            <tr>
-              <td><code>${f.id}</code></td>
-              <td>${f.name}</td>
-              <td>${f.department}</td>
-              <td>${f.designation}</td>
-              <td>${(f.subjects||[]).join(', ')}</td>
-              <td><a href="mailto:${f.email}">${f.email}</a></td>
-              <td class="text-center">${f.publications}</td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Viewing ${f.name}', 'info')">👁️</button>
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Edit ${f.name}', 'info')">✏️</button>
-                </div>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Designation</th><th>Subjects</th><th>Experience</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${APP_DATA.faculty.map(f => `
+          <tr>
+            <td><code style="font-size:0.75rem;background:var(--bg-secondary);padding:0.125rem 0.375rem;border-radius:4px;">${f.id}</code></td>
+            <td style="font-weight:700;">${f.name}</td>
+            <td style="font-size:0.8125rem;">${f.department}</td>
+            <td style="font-size:0.8125rem;">${f.designation}</td>
+            <td>${f.subjects.slice(0,2).map(s=>`<span class="badge badge-secondary" style="margin-right:2px;">${s}</span>`).join('')}</td>
+            <td style="text-align:center;">${f.experience} yrs</td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Viewing ${f.name}','info')">👁</button>
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Editing ${f.name}','info')">✏️</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN EVENTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminEvents() {
-  const events = APP_DATA.events;
-
   return `
-  <div class="page-content">
-    <div class="page-header-row">
-      <div class="page-header">
-        <h1 class="page-title">🎉 Event Management</h1>
-      </div>
-      <button class="btn btn-primary" onclick="openCreateEventModal()">+ Add Event</button>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">🎉 Events Management</div></div>
+      <button class="btn btn-primary" onclick="openAdminEventModal()">+ Add Event</button>
     </div>
-
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Title</th><th>Category</th><th>Date</th><th>Venue</th><th>Organizer</th><th>Registered</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${events.map(e => `
-            <tr>
-              <td>${e.title}</td>
-              <td><span class="badge badge-secondary">${e.category}</span></td>
-              <td>${formatDate(e.date)}</td>
-              <td>${e.venue.split('&')[0].trim()}</td>
-              <td>${e.organizer}</td>
-              <td>${e.registeredCount}/${e.maxParticipants}</td>
-              <td><span class="badge badge-${getStatusColor(e.status)}">${e.status}</span></td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Editing event...', 'info')">✏️</button>
-                  <button class="btn btn-danger btn-sm" onclick="showToast('Event removed.', 'warning')">🗑️</button>
-                </div>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Event</th><th>Category</th><th>Date</th><th>Venue</th><th>Registrations</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${APP_DATA.events.map(e => `
+          <tr>
+            <td style="font-weight:700;">${e.emoji} ${e.title}</td>
+            <td><span class="badge badge-secondary">${e.category}</span></td>
+            <td style="font-size:0.8125rem;">${formatDateShort(e.date)}</td>
+            <td style="font-size:0.8125rem;">${e.venue}</td>
+            <td style="text-align:center;">${e.registeredSeats}/${e.seats}</td>
+            <td><span class="badge badge-${getStatusColor(e.status)}">${getStatusLabel(e.status)}</span></td>
+            <td>
+              <div class="actions">
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Viewing event...','info')">👁</button>
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Editing event...','info')">✏️</button>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-function openCreateEventModal() {
+function openAdminEventModal() {
   openModal(`
-  <div class="modal-inner">
-    <div class="modal-header"><h2>Create New Event</h2><button class="modal-close" onclick="closeModal(true)">✕</button></div>
-    <form onsubmit="createEvent(event)">
-      <div class="form-group"><label class="form-label">Event Title *</label><input type="text" id="evt-title" class="form-input" required></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Category</label>
-          <select id="evt-cat" class="form-select">
-            <option>Hackathon</option><option>Workshop</option><option>Guest Lecture</option><option>Sports</option><option>Cultural</option><option>Tech Fest</option>
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Date *</label><input type="date" id="evt-date" class="form-input" required></div>
+  <div class="modal-header"><div class="modal-title">🎉 Add New Event</div><button class="modal-close" onclick="closeModal(true)">✕</button></div>
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Event Title *</label><input type="text" class="form-input" placeholder="Event name"></div>
+    <div class="grid-2">
+      <div class="form-group"><label class="form-label">Date *</label><input type="date" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Category *</label>
+        <select class="form-select"><option>Workshop</option><option>Seminar</option><option>Hackathon</option><option>Cultural Events</option><option>Sports Events</option></select>
       </div>
-      <div class="form-group"><label class="form-label">Venue</label><input type="text" id="evt-venue" class="form-input" placeholder="Seminar Hall, Auditorium..."></div>
-      <div class="form-group"><label class="form-label">Description</label><textarea id="evt-desc" class="form-textarea" rows="3"></textarea></div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal(true)">Cancel</button>
-        <button type="submit" class="btn btn-primary">Create Event</button>
-      </div>
-    </form>
+    </div>
+    <div class="form-group"><label class="form-label">Venue *</label><input type="text" class="form-input" placeholder="e.g. Main Auditorium"></div>
+    <div class="form-group"><label class="form-label">Description</label><textarea class="form-input" rows="3"></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal(true)">Cancel</button>
+    <button class="btn btn-primary" onclick="closeModal(true);showToast('Event created successfully!','success')">Create Event</button>
   </div>`);
 }
 
-function createEvent(e) {
-  e.preventDefault();
-  const title = document.getElementById('evt-title').value;
-  const date = document.getElementById('evt-date').value;
-  if (!title || !date) { showToast('Fill required fields.', 'error'); return; }
-  APP_DATA.events.push({
-    id: 'EVT' + Date.now(), title, category: document.getElementById('evt-cat').value,
-    date, endDate: date, time: '09:00 AM',
-    venue: document.getElementById('evt-venue').value || 'To be announced',
-    organizer: APP_STATE.currentUser.name,
-    description: document.getElementById('evt-desc').value,
-    registrationDeadline: date, maxParticipants: 100, registeredCount: 0,
-    prizes: [], tags: [], imageColor: '#4f46e5', status: 'upcoming', isRegistered: false, registered: []
-  });
-  closeModal(true);
-  showToast('Event created successfully!', 'success');
-  navigate('admin-events');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN NOTICES
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminNotices() {
-  const notices = APP_DATA.notices;
-
   return `
-  <div class="page-content">
-    <div class="page-header-row">
-      <div class="page-header">
-        <h1 class="page-title">📰 Notice Management</h1>
-      </div>
-      <button class="btn btn-primary" onclick="openCreateNoticeModal()">+ Add Notice</button>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">📢 Notice Management</div></div>
+      <button class="btn btn-primary" onclick="openAdminNoticeModal()">+ Post Notice</button>
     </div>
-
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Title</th><th>Category</th><th>Priority</th><th>Posted By</th><th>Date</th><th>Audience</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${notices.map(n => `
-            <tr>
-              <td>${n.title}</td>
-              <td><span class="badge badge-secondary">${n.category}</span></td>
-              <td><span class="badge badge-${n.priority === 'urgent' ? 'danger' : n.priority === 'high' ? 'warning' : 'info'}">${n.priority}</span></td>
-              <td>${n.postedBy}</td>
-              <td>${formatDate(n.date)}</td>
-              <td>${n.targetAudience}</td>
-              <td>
-                <div style="display:flex;gap:6px">
-                  <button class="btn btn-ghost btn-sm" onclick="showToast('Editing notice...', 'info')">✏️</button>
-                  <button class="btn btn-danger btn-sm" onclick="showToast('Notice removed.', 'warning')">🗑️</button>
-                </div>
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Title</th><th>Category</th><th>Priority</th><th>Date</th><th>Posted By</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${APP_DATA.notices.map(n => `
+          <tr>
+            <td style="font-weight:700;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${n.title}</td>
+            <td><span class="badge badge-secondary">${n.category}</span></td>
+            <td><span class="badge badge-${n.priority==='urgent'?'danger':n.priority==='high'?'warning':'secondary'}">${n.priority}</span></td>
+            <td style="font-size:0.8125rem;">${formatDateShort(n.date)}</td>
+            <td style="font-size:0.8125rem;">${n.postedBy}</td>
+            <td><div class="actions">
+              <button class="btn btn-ghost btn-sm" onclick="showToast('Editing notice...','info')">✏️</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="showToast('Notice deleted.','info')">🗑</button>
+            </div></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
     </div>
   </div>`;
 }
 
-function openCreateNoticeModal() {
+function openAdminNoticeModal() {
   openModal(`
-  <div class="modal-inner">
-    <div class="modal-header"><h2>Post New Notice</h2><button class="modal-close" onclick="closeModal(true)">✕</button></div>
-    <form onsubmit="createNotice(event)">
-      <div class="form-group"><label class="form-label">Title *</label><input type="text" id="ntc-title" class="form-input" required></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Category</label>
-          <select id="ntc-cat" class="form-select">
-            <option>General</option><option>Examination</option><option>Academic</option><option>Holiday</option><option>Placement</option><option>Urgent</option>
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Priority</label>
-          <select id="ntc-priority" class="form-select">
-            <option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="urgent">Urgent</option>
-          </select>
-        </div>
+  <div class="modal-header"><div class="modal-title">📢 Post New Notice</div><button class="modal-close" onclick="closeModal(true)">✕</button></div>
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Title *</label><input type="text" class="form-input" placeholder="Notice title"></div>
+    <div class="grid-2">
+      <div class="form-group"><label class="form-label">Category</label>
+        <select class="form-select"><option>Academic</option><option>Examination</option><option>Placement</option><option>Event</option><option>Holiday</option><option>Urgent</option><option>General</option></select>
       </div>
-      <div class="form-group"><label class="form-label">Content *</label><textarea id="ntc-content" class="form-textarea" rows="4" required></textarea></div>
-      <div class="form-group"><label class="form-label">Target Audience</label>
-        <select id="ntc-audience" class="form-select">
-          <option value="all">All</option><option value="students">Students</option><option value="faculty">Faculty</option><option value="final-year">Final Year</option>
-        </select>
+      <div class="form-group"><label class="form-label">Priority</label>
+        <select class="form-select"><option>low</option><option>medium</option><option>high</option><option>urgent</option></select>
       </div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" onclick="closeModal(true)">Cancel</button>
-        <button type="submit" class="btn btn-primary">Post Notice</button>
-      </div>
-    </form>
+    </div>
+    <div class="form-group"><label class="form-label">Description *</label><textarea class="form-input" rows="4" placeholder="Notice content..."></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal(true)">Cancel</button>
+    <button class="btn btn-primary" onclick="closeModal(true);showToast('Notice posted successfully!','success')">Post Notice</button>
   </div>`);
 }
 
-function createNotice(e) {
-  e.preventDefault();
-  const title = document.getElementById('ntc-title').value;
-  const content = document.getElementById('ntc-content').value;
-  if (!title || !content) { showToast('Fill required fields.', 'error'); return; }
-  APP_DATA.notices.unshift({
-    id: 'NOT' + Date.now(), title, category: document.getElementById('ntc-cat').value,
-    date: new Date().toISOString().split('T')[0],
-    postedBy: APP_STATE.currentUser.name, content,
-    priority: document.getElementById('ntc-priority').value,
-    targetAudience: document.getElementById('ntc-audience').value,
-    isRead: false, attachmentUrl: null
-  });
-  closeModal(true);
-  showToast('Notice posted successfully!', 'success');
-  navigate('admin-notices');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN APPLICATIONS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminApplications() {
-  const leaves = Object.values(APP_DATA.leaveApplications).flat();
-  const campusApps = Object.values(APP_DATA.campusApplications).flat();
-  const complaints = Object.values(APP_DATA.complaints).flat();
-
-  const activeTab = APP_STATE.adminAppTab || 'leave';
-
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">📋 Applications & Requests</h1>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">📋 Applications Management</div></div>
     </div>
-
-    <div class="filter-tabs">
-      <button class="filter-tab ${activeTab === 'leave' ? 'active' : ''}" onclick="APP_STATE.adminAppTab='leave'; navigate('admin-applications')">📋 Leave (${leaves.length})</button>
-      <button class="filter-tab ${activeTab === 'campus' ? 'active' : ''}" onclick="APP_STATE.adminAppTab='campus'; navigate('admin-applications')">🏢 Campus Services (${campusApps.length})</button>
-      <button class="filter-tab ${activeTab === 'complaints' ? 'active' : ''}" onclick="APP_STATE.adminAppTab='complaints'; navigate('admin-applications')">📣 Complaints (${complaints.length})</button>
+    <div class="tabs" id="apps-tabs">
+      <button class="tab active" onclick="showAppsTab('leave',this)">Leave Requests (${APP_DATA.leaveApplications.length})</button>
+      <button class="tab" onclick="showAppsTab('campus',this)">Campus Services (${APP_DATA.campusApplications.length})</button>
+      <button class="tab" onclick="showAppsTab('complaints',this)">Complaints (${APP_DATA.complaints.length})</button>
     </div>
-
-    ${activeTab === 'leave' ? `
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Student</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${leaves.map(l => `
-            <tr>
-              <td><code>${l.id}</code></td>
-              <td>${l.studentName || 'Aarav Patel'}</td>
-              <td>${l.type}</td>
-              <td>${formatDate(l.fromDate)}</td>
-              <td>${formatDate(l.toDate)}</td>
-              <td class="text-center">${l.days}</td>
-              <td><span class="badge badge-${getStatusColor(l.status)}">${l.status}</span></td>
-              <td>
-                ${l.status === 'pending' ? `
-                <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}')">✅</button>
-                <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}')">❌</button>` : '–'}
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>` : ''}
-
-    ${activeTab === 'campus' ? `
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Type</th><th>Purpose</th><th>Applied On</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${campusApps.map(a => `
-            <tr>
-              <td><code>${a.id}</code></td>
-              <td>${a.type}</td>
-              <td>${a.purpose.substring(0, 60)}…</td>
-              <td>${formatDate(a.appliedOn)}</td>
-              <td><span class="badge badge-${getStatusColor(a.status)}">${a.status}</span></td>
-              <td>
-                ${a.status === 'pending' ? `<button class="btn btn-success btn-sm" onclick="showToast('Application approved!','success'); a.status='completed'">Approve</button>` : '–'}
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>` : ''}
-
-    ${activeTab === 'complaints' ? `
-    <div class="section-card">
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>ID</th><th>Category</th><th>Subject</th><th>Severity</th><th>Submitted</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody>
-            ${complaints.map(c => `
-            <tr>
-              <td><code>${c.id}</code></td>
-              <td>${c.category}</td>
-              <td>${c.subject}</td>
-              <td><span class="badge badge-${c.severity === 'high' ? 'danger' : c.severity === 'medium' ? 'warning' : 'info'}">${c.severity}</span></td>
-              <td>${formatDate(c.submittedOn)}</td>
-              <td><span class="badge badge-${getStatusColor(c.status)}">${c.status}</span></td>
-              <td>
-                ${c.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="showToast('Resolving complaint...','info')">Resolve</button>` : '–'}
-              </td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>` : ''}
+    <div id="apps-content">
+      ${renderLeaveAppsTable()}
+    </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+function renderLeaveAppsTable() {
+  return `<div class="table-wrapper">
+    <table class="table">
+      <thead><tr><th>Student</th><th>Type</th><th>Dates</th><th>Reason</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${APP_DATA.leaveApplications.map(l => `
+        <tr>
+          <td style="font-weight:600;">${l.studentName} <br><span style="font-size:0.75rem;color:var(--text-muted);">${l.studentId}</span></td>
+          <td><span class="badge badge-secondary">${l.type}</span></td>
+          <td style="font-size:0.8125rem;">${formatDateShort(l.startDate)}<br>→ ${formatDateShort(l.endDate)}</td>
+          <td style="font-size:0.8125rem;max-width:150px;">${l.reason.substring(0,60)}...</td>
+          <td><span class="badge badge-${getStatusColor(l.status)}">${getStatusLabel(l.status)}</span></td>
+          <td>
+            ${l.status === 'pending' ? `<div class="actions">
+              <button class="btn btn-success btn-sm" onclick="approveLeave('${l.id}');navigate('admin-applications')">✅</button>
+              <button class="btn btn-danger btn-sm" onclick="rejectLeave('${l.id}');navigate('admin-applications')">❌</button>
+            </div>` : '<span style="font-size:0.8125rem;color:var(--text-muted);">Processed</span>'}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function showAppsTab(tab, btn) {
+  document.querySelectorAll('#apps-tabs .tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  const el = document.getElementById('apps-content');
+  if (tab === 'leave') el.innerHTML = renderLeaveAppsTable();
+  else if (tab === 'campus') el.innerHTML = `<div class="table-wrapper"><table class="table">
+    <thead><tr><th>Student</th><th>Service</th><th>Purpose</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>${APP_DATA.campusApplications.map(a => `<tr>
+      <td style="font-weight:600;">${a.studentName}</td>
+      <td>${a.type}</td>
+      <td style="font-size:0.8125rem;">${a.purpose}</td>
+      <td style="font-size:0.8125rem;">${formatDateShort(a.submittedDate)}</td>
+      <td><span class="badge badge-${getStatusColor(a.status)}">${getStatusLabel(a.status)}</span></td>
+      <td><button class="btn btn-primary btn-sm" onclick="showToast('Processing ${a.type}...','info')">Process</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+  else el.innerHTML = `<div class="table-wrapper"><table class="table">
+    <thead><tr><th>Student</th><th>Category</th><th>Subject</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+    <tbody>${APP_DATA.complaints.map(c => `<tr>
+      <td style="font-weight:600;">${c.studentName}</td>
+      <td><span class="badge badge-secondary">${c.category}</span></td>
+      <td style="font-size:0.8125rem;">${c.subject.substring(0,50)}...</td>
+      <td style="font-size:0.8125rem;">${formatDateShort(c.submittedDate)}</td>
+      <td><span class="badge badge-${getStatusColor(c.status)}">${getStatusLabel(c.status)}</span></td>
+      <td><button class="btn btn-primary btn-sm" onclick="showToast('Updating complaint status...','info')">Update</button></td>
+    </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ============================================================
 // ADMIN REPORTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminReports() {
   const stats = APP_DATA.adminStats;
-
   return `
-  <div class="page-content">
-    <div class="page-header-row">
-      <div class="page-header">
-        <h1 class="page-title">📊 Analytics & Reports</h1>
-        <p class="page-subtitle">College-wide performance overview</p>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-outline" onclick="showToast('Exporting PDF report...', 'success')">📄 Export PDF</button>
-        <button class="btn btn-outline" onclick="showToast('Exporting Excel...', 'success')">📊 Export Excel</button>
-      </div>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">📊 Reports & Analytics</div></div>
+      <button class="btn btn-secondary" onclick="showToast('Report exported!','success')">⬇ Export Report</button>
     </div>
-
-    <!-- Summary Stats -->
-    <div class="stats-row">
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">👨‍🎓</div><div class="stat-card-body"><div class="stat-card-value">4,850</div><div class="stat-card-label">Total Enrolled</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#10b981,#059669)">📊</div><div class="stat-card-body"><div class="stat-card-value">7.82</div><div class="stat-card-label">Avg CGPA</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#06b6d4,#0284c7)">📅</div><div class="stat-card-body"><div class="stat-card-value">86.2%</div><div class="stat-card-label">Avg Attendance</div></div></div>
-      <div class="stat-card"><div class="stat-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">💼</div><div class="stat-card-body"><div class="stat-card-value">94%</div><div class="stat-card-label">Placement Rate</div></div></div>
+    <div class="stats-grid section-mb">
+      <div class="stat-card"><div class="stat-card-icon primary">👨‍🎓</div><div><div class="stat-card-value">${stats.totalStudents.toLocaleString()}</div><div class="stat-card-label">Total Students</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon success">📊</div><div><div class="stat-card-value">${stats.avgCGPA}</div><div class="stat-card-label">Average CGPA</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon info">📅</div><div><div class="stat-card-value">${stats.avgAttendance}%</div><div class="stat-card-label">Avg Attendance</div></div></div>
+      <div class="stat-card"><div class="stat-card-icon warning">🎉</div><div><div class="stat-card-value">${stats.activeEvents}</div><div class="stat-card-label">Active Events</div></div></div>
     </div>
-
-    <!-- Charts Grid -->
-    <div class="charts-row">
-      <div class="section-card" style="flex:1">
-        <h2 class="section-card-title">📊 Dept. CGPA Comparison</h2>
-        <div class="chart-container" style="height:260px"><canvas id="deptChart"></canvas></div>
-      </div>
-      <div class="section-card" style="flex:1">
-        <h2 class="section-card-title">📈 Attendance Trend</h2>
-        <div class="chart-container" style="height:260px"><canvas id="attChart"></canvas></div>
-      </div>
+    <div class="two-col-layout section-mb">
+      <div class="card"><div class="card-header"><div class="card-title">📊 Department CGPA</div></div>
+        <div class="card-body"><div class="chart-wrapper"><canvas id="deptChart"></canvas></div></div></div>
+      <div class="card"><div class="card-header"><div class="card-title">📈 Attendance Trend</div></div>
+        <div class="card-body"><div class="chart-wrapper"><canvas id="enrollChart"></canvas></div></div></div>
     </div>
-
-    <!-- Dept Table -->
-    <div class="section-card">
-      <h2 class="section-card-title">🏛️ Department-wise Summary</h2>
+    <div class="card">
+      <div class="card-header"><div class="card-title">📋 Department Summary</div></div>
       <div class="table-wrapper">
-        <table class="data-table">
-          <thead><tr><th>Department</th><th>Students</th><th>Faculty</th><th>Avg CGPA</th><th>Placement Rate</th><th>Performance</th></tr></thead>
+        <table class="table">
+          <thead><tr><th>Department</th><th>HOD</th><th>Students</th><th>Faculty</th><th>Avg CGPA</th></tr></thead>
           <tbody>
-            ${APP_DATA.departments.map(d => `
-            <tr>
-              <td><strong>${d.name}</strong> (${d.code})</td>
-              <td>${d.students}</td>
-              <td>${d.faculty}</td>
-              <td><strong class="text-primary">${d.avgCGPA}</strong></td>
-              <td>${d.placementRate}%</td>
-              <td>
-                <div class="mini-progress">
-                  <div class="mini-progress-fill" style="width:${d.placementRate}%;background:${d.color}"></div>
-                </div>
-              </td>
+            ${APP_DATA.departments.map(d => `<tr>
+              <td style="font-weight:700;">${d.name}</td>
+              <td style="font-size:0.8125rem;">${d.hod}</td>
+              <td style="text-align:center;">${d.students}</td>
+              <td style="text-align:center;">${d.faculty}</td>
+              <td style="text-align:center;font-weight:700;color:var(--primary);">${d.avgCGPA}</td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div>
     </div>
-
-    <!-- Enrollment Trend -->
-    <div class="section-card">
-      <h2 class="section-card-title">📈 Enrollment Trend</h2>
-      <div class="enrollment-trend">
-        ${stats.enrollmentTrend.map(e => `
-        <div class="enrollment-item">
-          <div class="enrollment-bar" style="height:${(e.students/5000)*150}px"></div>
-          <div class="enrollment-count">${e.students.toLocaleString()}</div>
-          <div class="enrollment-year">${e.year}</div>
-        </div>`).join('')}
-      </div>
-    </div>
   </div>`;
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // ADMIN SETTINGS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderAdminSettings() {
-  const college = APP_DATA.college;
-
   return `
-  <div class="page-content">
-    <div class="page-header">
-      <h1 class="page-title">⚙️ System Settings</h1>
-      <p class="page-subtitle">Configure college portal settings</p>
+  <div>
+    <div class="page-header-row mb-6">
+      <div class="page-header"><div class="page-title">⚙️ System Settings</div></div>
     </div>
-
-    <div class="settings-grid">
-      <!-- General Settings -->
-      <div class="section-card">
-        <h2 class="section-card-title">🏛️ General Settings</h2>
-        <form onsubmit="saveSettings(event)">
-          <div class="form-group"><label class="form-label">College Name</label><input type="text" class="form-input" value="${college.name}"></div>
-          <div class="form-group"><label class="form-label">Short Name</label><input type="text" class="form-input" value="${college.shortName}"></div>
-          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" value="${college.email}"></div>
-          <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" value="${college.phone}"></div>
-          <div class="form-group"><label class="form-label">Address</label><textarea class="form-textarea" rows="2">${college.address}</textarea></div>
-          <button type="submit" class="btn btn-primary">💾 Save Changes</button>
-        </form>
-      </div>
-
-      <!-- Academic Settings -->
-      <div class="section-card">
-        <h2 class="section-card-title">📚 Academic Configuration</h2>
-        <div class="form-group">
-          <label class="form-label">Minimum Attendance Threshold (%)</label>
-          <div style="display:flex;align-items:center;gap:12px">
-            <input type="range" id="att-threshold" min="60" max="90" value="75" oninput="document.getElementById('att-val').textContent=this.value+'%'" style="flex:1">
-            <span id="att-val" class="font-semibold text-primary">75%</span>
+    <div class="two-col-layout">
+      <div class="card">
+        <div class="card-header"><div class="card-title">📅 Attendance Rules</div></div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Minimum Required Attendance (%)</label>
+            <input type="number" class="form-input" id="min-attendance" value="${APP_DATA.config.minAttendanceRequired}" min="50" max="100">
+            <div class="form-helper">Students below this threshold will receive warnings.</div>
           </div>
-          <p class="text-muted text-sm mt-1">Students below this threshold may be debarred from examinations.</p>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Condonation Limit (%)</label>
-          <input type="number" class="form-input" value="5" min="0" max="10">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Grading Scale</label>
-          <select class="form-select"><option>10-Point Scale (O/A+/A/B+/B/C/F)</option></select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Maximum Backlogs Allowed for Placement</label>
-          <input type="number" class="form-input" value="0" min="0" max="5">
-        </div>
-        <button class="btn btn-primary mt-2" onclick="showToast('Academic settings saved!', 'success')">💾 Save</button>
-      </div>
-
-      <!-- Grading Scale -->
-      <div class="section-card">
-        <h2 class="section-card-title">📐 Grading Scale</h2>
-        <div class="grade-scale-grid">
-          ${[
-            { grade:'O', range:'90-100', gp:10, color:'#10b981' },
-            { grade:'A+', range:'80-89', gp:9, color:'#4f46e5' },
-            { grade:'A', range:'70-79', gp:9, color:'#06b6d4' },
-            { grade:'B+', range:'60-69', gp:8, color:'#f59e0b' },
-            { grade:'B', range:'50-59', gp:7, color:'#f97316' },
-            { grade:'C', range:'40-49', gp:6, color:'#ef4444' },
-            { grade:'F', range:'<40', gp:0, color:'#6b7280' },
-          ].map(g => `
-          <div class="grade-scale-item">
-            <div class="grade-scale-badge" style="background:${g.color}">${g.grade}</div>
-            <div class="grade-scale-info">
-              <div class="grade-scale-range">${g.range}</div>
-              <div class="grade-scale-gp">${g.gp} GP</div>
-            </div>
-          </div>`).join('')}
+          <button class="btn btn-primary" onclick="saveAttendanceSettings()">Save Settings</button>
         </div>
       </div>
-
-      <!-- Notification Settings -->
-      <div class="section-card">
-        <h2 class="section-card-title">🔔 Notification Settings</h2>
-        <div class="settings-toggle-list">
-          ${[
-            ['Email notifications for leave approvals', true],
-            ['SMS alerts for low attendance', true],
-            ['Push notifications for new notices', true],
-            ['Weekly academic summary email', false],
-            ['Placement drive reminders', true],
-          ].map(([label, enabled]) => `
-          <div class="settings-toggle">
-            <span class="settings-toggle-label">${label}</span>
-            <label class="toggle-switch">
-              <input type="checkbox" ${enabled ? 'checked' : ''} onchange="showToast('Notification setting updated.', 'info')">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>`).join('')}
+      <div class="card">
+        <div class="card-header"><div class="card-title">📊 Grading Scale</div></div>
+        <div class="card-body">
+          <div class="table-wrapper"><table class="table">
+            <thead><tr><th>Range</th><th>Grade</th><th>Points</th></tr></thead>
+            <tbody>${APP_DATA.config.gradingScale.map(g => `<tr><td>${g.range}</td><td><span class="badge badge-primary">${g.grade}</span></td><td style="font-weight:700;">${g.points}</td></tr>`).join('')}</tbody>
+          </table></div>
         </div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:1.25rem;">
+      <div class="card-header"><div class="card-title">🏫 College Information</div></div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:1rem;">
+          <div class="form-group"><label class="form-label">College Name</label><input type="text" class="form-input" value="${APP_DATA.college.name}"></div>
+          <div class="form-group"><label class="form-label">Academic Year</label><input type="text" class="form-input" value="${APP_DATA.config.academicYear}"></div>
+          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" value="${APP_DATA.college.email}"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-input" value="${APP_DATA.college.phone}"></div>
+        </div>
+        <button class="btn btn-primary" onclick="showToast('Settings saved successfully!','success')">Save Changes</button>
       </div>
     </div>
   </div>`;
 }
 
-function saveSettings(e) {
-  e.preventDefault();
-  showToast('Settings saved successfully!', 'success');
+function saveAttendanceSettings() {
+  const val = parseInt(document.getElementById('min-attendance').value);
+  if (val < 50 || val > 100) { showToast('Please enter a value between 50 and 100.', 'error'); return; }
+  APP_DATA.config.minAttendanceRequired = val;
+  APP_DATA.attendance.STU1001.minRequired = val;
+  showToast(`Minimum attendance updated to ${val}%`, 'success');
 }
 
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // CHARTS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function renderCGPACharts() {
   const ctx = document.getElementById('sgpaChart');
   if (!ctx) return;
-  const results = APP_DATA.semesterResults['STU1001'].filter(s => s.sgpa !== null);
+  const results = APP_DATA.semesterResults.STU1001.filter(s => s.sgpa !== null);
   APP_STATE.charts.sgpa = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: results.map(s => `Sem ${s.semester}`),
       datasets: [{
-        label: 'SGPA',
-        data: results.map(s => parseFloat(s.sgpa)),
-        backgroundColor: 'rgba(79,70,229,0.8)',
-        borderColor: '#4f46e5',
-        borderWidth: 2,
-        borderRadius: 6
+        label: 'SGPA', data: results.map(s => s.sgpa),
+        backgroundColor: 'rgba(79, 70, 229, 0.8)', borderColor: '#4f46e5',
+        borderWidth: 2, borderRadius: 6
       }]
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
-      scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } }
+      scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 }, grid: { color: 'rgba(0,0,0,0.05)' } } }
     }
   });
 }
@@ -3456,18 +3114,10 @@ function renderFacultyCharts() {
   APP_STATE.charts.perf = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels: ['CGPA ≥ 9', 'CGPA 8–9', 'CGPA 7–8', 'CGPA < 7'],
-      datasets: [{
-        data: [2, 3, 2, 1],
-        backgroundColor: ['#10b981','#4f46e5','#f59e0b','#ef4444'],
-        borderWidth: 0
-      }]
+      labels: ['CGPA ≥ 9', 'CGPA 8-9', 'CGPA 7-8', 'CGPA < 7'],
+      datasets: [{ data: [8, 22, 24, 8], backgroundColor: ['#10b981', '#4f46e5', '#f59e0b', '#ef4444'], borderWidth: 0 }]
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom' } }
-    }
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
   });
 }
 
@@ -3477,131 +3127,59 @@ function renderAdminCharts() {
     APP_STATE.charts.dept = new Chart(deptCtx, {
       type: 'bar',
       data: {
-        labels: APP_DATA.adminStats.departmentCGPA.map(d => d.dept),
-        datasets: [{
-          label: 'Avg CGPA',
-          data: APP_DATA.adminStats.departmentCGPA.map(d => d.cgpa),
-          backgroundColor: ['#4f46e5','#06b6d4','#10b981','#8b5cf6','#f59e0b','#ef4444'],
-          borderRadius: 6
-        }]
+        labels: Object.keys(APP_DATA.adminStats.departmentCGPA),
+        datasets: [{ label: 'Avg CGPA', data: Object.values(APP_DATA.adminStats.departmentCGPA),
+          backgroundColor: ['#4f46e5','#06b6d4','#10b981','#f59e0b','#8b5cf6','#ef4444'], borderRadius: 6, borderWidth: 0 }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
+      options: { responsive: true, maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: { y: { min: 0, max: 10 } }
+        scales: { y: { min: 0, max: 10, ticks: { stepSize: 1 } } }
       }
     });
   }
-
   const enrollCtx = document.getElementById('enrollChart');
   if (enrollCtx) {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     APP_STATE.charts.enroll = new Chart(enrollCtx, {
       type: 'line',
       data: {
-        labels: APP_DATA.adminStats.attendanceTrend.map(d => d.month),
+        labels: months,
         datasets: [{
-          label: 'Attendance %',
-          data: APP_DATA.adminStats.attendanceTrend.map(d => d.percentage),
-          borderColor: '#4f46e5',
-          backgroundColor: 'rgba(79,70,229,0.1)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointBackgroundColor: '#4f46e5'
+          label: 'Attendance %', data: APP_DATA.adminStats.attendanceTrend,
+          borderColor: '#4f46e5', backgroundColor: 'rgba(79,70,229,0.1)', tension: 0.4, fill: true, borderWidth: 2
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } }
-      }
-    });
-  }
-
-  const attCtx = document.getElementById('attChart');
-  if (attCtx) {
-    APP_STATE.charts.att = new Chart(attCtx, {
-      type: 'line',
-      data: {
-        labels: APP_DATA.adminStats.attendanceTrend.map(d => d.month),
-        datasets: [{
-          label: 'Attendance %',
-          data: APP_DATA.adminStats.attendanceTrend.map(d => d.percentage),
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6,182,212,0.1)',
-          tension: 0.4,
-          fill: true,
-          pointRadius: 4,
-          pointBackgroundColor: '#06b6d4'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { min: 60, max: 100 } }
       }
     });
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-// GLOBAL SEARCH
-// ─────────────────────────────────────────────────────────────
-function handleGlobalSearch(query) {
-  if (!query || query.length < 2) { hideSearchDropdown(); return; }
-  const results = [];
-  const q = query.toLowerCase();
-
-  APP_DATA.events.filter(e => e.title.toLowerCase().includes(q)).slice(0, 3).forEach(e =>
-    results.push({ type:'Event', label:e.title, icon:'🎉', page: APP_STATE.currentUser?.role === 'admin' ? 'admin-events' : 'student-events' }));
-  APP_DATA.notices.filter(n => n.title.toLowerCase().includes(q)).slice(0, 3).forEach(n =>
-    results.push({ type:'Notice', label:n.title, icon:'📰', page: APP_STATE.currentUser?.role === 'admin' ? 'admin-notices' : 'student-notices' }));
-  APP_DATA.facultyDirectory.filter(f => f.name.toLowerCase().includes(q)).slice(0, 2).forEach(f =>
-    results.push({ type:'Faculty', label:f.name, icon:'👨‍🏫', page:'faculty-directory' }));
-  APP_DATA.studyResources.filter(r => r.title.toLowerCase().includes(q)).slice(0, 2).forEach(r =>
-    results.push({ type:'Resource', label:r.title, icon:'💾', page:'student-resources' }));
-  APP_DATA.students.filter(s => s.name.toLowerCase().includes(q)).slice(0, 2).forEach(s =>
-    results.push({ type:'Student', label:s.name, icon:'👨‍🎓', page:'admin-students' }));
-
-  const dropdown = document.getElementById('search-dropdown');
-  if (!dropdown) return;
-  if (!results.length) {
-    dropdown.innerHTML = '<div class="search-empty">No results found</div>';
-  } else {
-    dropdown.innerHTML = results.map(r => `
-    <div class="search-result-item" onclick="navigate('${r.page}'); hideSearchDropdown();">
-      <span class="search-result-icon">${r.icon}</span>
-      <div>
-        <div class="search-result-label">${r.label}</div>
-        <div class="search-result-type">${r.type}</div>
-      </div>
-    </div>`).join('');
-  }
-  dropdown.classList.add('visible');
-}
-
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 // AI ASSISTANT
-// ─────────────────────────────────────────────────────────────
+// ============================================================
 function toggleAI() {
   const panel = document.getElementById('ai-assistant');
   if (!panel) return;
   panel.classList.toggle('hidden');
   if (!panel.classList.contains('hidden')) {
+    APP_STATE.aiOpen = true;
     initAIChat();
-    document.getElementById('ai-input')?.focus();
+    setTimeout(() => document.getElementById('ai-input').focus(), 100);
+  } else {
+    APP_STATE.aiOpen = false;
   }
 }
 
 function initAIChat() {
   const messagesEl = document.getElementById('ai-messages');
-  if (!messagesEl) return;
-  if (messagesEl.innerHTML.trim() === '') {
-    const user = APP_STATE.currentUser;
-    if (!user) return;
-    addAIMessage(`Hi ${user.name.split(' ')[0]}! 👋 I'm your Smart Campus Assistant. How can I help you today?`);
-    showAISuggestions();
-  }
+  if (!messagesEl || messagesEl.children.length > 0) return;
+  const user = APP_STATE.currentUser;
+  if (!user) return;
+  addAIMessage(`Hi ${user.name.split(' ')[0]}! 👋 I'm your <strong>Smart Campus Assistant</strong>.<br>I can help you with attendance, CGPA, assignments, events, and more. Just ask!`);
+  showAISuggestions();
 }
 
 function addAIMessage(text, isUser = false, cards = null) {
@@ -3609,10 +3187,10 @@ function addAIMessage(text, isUser = false, cards = null) {
   if (!messagesEl) return;
   const div = document.createElement('div');
   div.className = `ai-message ${isUser ? 'user-message' : 'assistant-message'}`;
-  div.innerHTML = `
-    ${!isUser ? '<div class="ai-msg-avatar">🤖</div>' : ''}
+  div.style.animation = 'fadeInUp 0.2s ease';
+  div.innerHTML = `${!isUser ? '<div class="ai-msg-avatar">🤖</div>' : ''}
     <div class="ai-msg-bubble">
-      <p>${text}</p>
+      <div>${text}</div>
       ${cards ? `<div class="ai-cards">${cards}</div>` : ''}
     </div>`;
   messagesEl.appendChild(div);
@@ -3625,7 +3203,8 @@ function showTypingIndicator() {
   const div = document.createElement('div');
   div.className = 'ai-message assistant-message';
   div.id = 'typing-indicator';
-  div.innerHTML = `<div class="ai-msg-avatar">🤖</div><div class="ai-msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+  div.innerHTML = `<div class="ai-msg-avatar">🤖</div>
+    <div class="ai-msg-bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
   messagesEl.appendChild(div);
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
@@ -3640,120 +3219,142 @@ function sendAIMessage() {
   if (!input) return;
   const text = input.value.trim();
   if (!text) return;
-  addAIMessage(text, true);
+  addAIMessage(escapeHtml(text), true);
   input.value = '';
+  document.getElementById('ai-suggestions').innerHTML = '';
   showTypingIndicator();
-  const sugEl = document.getElementById('ai-suggestions');
-  if (sugEl) sugEl.innerHTML = '';
-  setTimeout(() => {
-    removeTypingIndicator();
-    processAIQuery(text);
-  }, 800 + Math.random() * 400);
+  setTimeout(() => { removeTypingIndicator(); processAIQuery(text); }, 600 + Math.random() * 400);
 }
 
-function handleAIInput(e) {
-  if (e.key === 'Enter') sendAIMessage();
-}
+function handleAIInput(e) { if (e.key === 'Enter') sendAIMessage(); }
 
 function processAIQuery(query) {
   const user = APP_STATE.currentUser;
-  const q = query.toLowerCase();
   if (!user) { addAIMessage('Please log in to use the assistant.'); return; }
+  const q = query.toLowerCase();
 
   if (user.role === 'student') {
-    const att = APP_DATA.attendance[user.id];
-    const results = APP_DATA.semesterResults[user.id];
+    const att = APP_DATA.attendance[user.id] || { overall: 0, subjects: [] };
+    const results = APP_DATA.semesterResults[user.id] || [];
+    const cgpa = calculateCGPA(results);
+    const pending = APP_DATA.assignments.filter(a => !a.studentStatus[user.id] || a.studentStatus[user.id] === 'pending');
 
     if (q.includes('attendance')) {
-      const subjects = att.subjects.map(s => `<div class="ai-att-item"><span>${s.name}</span><span class="badge badge-${s.percentage >= 85 ? 'success' : s.percentage >= 75 ? 'warning' : 'danger'}">${s.percentage}%</span></div>`).join('');
-      addAIMessage(`Your overall attendance is <strong>${att.overall}%</strong>. Subject-wise breakdown:`, false, `<div class="ai-att-list">${subjects}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-attendance')">📊 View Full Attendance</button>`);
-    } else if (q.includes('cgpa') || q.includes('gpa') || q.includes('grade') || q.includes('marks')) {
-      const cgpa = calculateCGPA(results);
-      const semList = results.filter(s => s.sgpa).map(s => `Sem ${s.semester}: ${s.sgpa}`).join(' | ');
-      addAIMessage(`Your current CGPA is <strong>${cgpa}</strong>. Semester-wise: ${semList}`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('student-cgpa')">📊 Academic Performance</button>`);
-    } else if (q.includes('timetable') || q.includes('class') || q.includes('today') || q.includes('schedule')) {
+      const subList = att.subjects.map(s => {
+        const st = getAttendanceStatus(s.percentage, att.minRequired || 75);
+        return `<div class="ai-att-item"><span>${s.name}</span><span class="badge badge-${st==='safe'?'success':st==='warning'?'warning':'danger'}">${s.percentage}%</span></div>`;
+      }).join('');
+      addAIMessage(`Your overall attendance is <strong>${att.overall}%</strong>. Subject breakdown:`, false,
+        `<div class="ai-att-list">${subList}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-attendance')">📅 View Full Attendance</button>`);
+    } else if (q.includes('cgpa') || q.includes('gpa') || q.includes('grade')) {
+      const semStr = results.filter(r=>r.sgpa).map(r=>`Sem ${r.semester}: ${r.sgpa}`).join(' · ');
+      addAIMessage(`Your current CGPA is <strong>${cgpa}/10</strong>.<br>${semStr}`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('student-cgpa')">📊 View Academic Performance</button>`);
+    } else if (q.includes('timetable') || q.includes('class') || q.includes('today') || q.includes('schedule') || q.includes('next class')) {
       const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
       const today = days[new Date().getDay()];
-      const tt = APP_DATA.timetable[user.id];
-      const todayClasses = (tt && (tt[today] || tt['Monday'])) || [];
-      const classList = todayClasses.map(c => `<div class="ai-class-item"><span class="ai-class-time">${c.time}</span><span>${c.subject}</span><span class="text-muted">${c.room}</span></div>`).join('');
-      addAIMessage(`You have <strong>${todayClasses.length} classes</strong> today. Here's your schedule:`, false, `<div class="ai-class-list">${classList}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-timetable')">📅 Open Timetable</button>`);
+      const tt = APP_DATA.timetable[user.id] || {};
+      const todayClasses = tt[today] || tt['Monday'] || [];
+      const classList = todayClasses.map(c =>
+        `<div class="ai-class-item"><span class="ai-class-time">${c.time}</span><span style="font-weight:600;">${c.subject}</span><span style="color:var(--text-muted);font-size:0.75rem;">${c.room}</span></div>`
+      ).join('');
+      addAIMessage(`You have <strong>${todayClasses.length} class(es)</strong> today (${today}):`, false,
+        `<div class="ai-class-list">${classList || '<div style="color:var(--text-muted);font-size:0.8125rem;">No classes today!</div>'}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-timetable')">⏰ Open Timetable</button>`);
     } else if (q.includes('assignment') || q.includes('due') || q.includes('deadline') || q.includes('homework')) {
-      const pending = APP_DATA.assignments.filter(a => a.studentId === user.id && (a.status === 'pending' || a.status === 'late'));
-      const list = pending.slice(0, 3).map(a => `<div class="ai-item"><span>${a.subject}: ${a.title}</span><span class="badge badge-warning">Due ${formatDate(a.dueDate)}</span></div>`).join('');
-      addAIMessage(`You have <strong>${pending.length} pending assignment(s)</strong>:`, false, `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-assignments')">📝 View Assignments</button>`);
+      const list = pending.slice(0,3).map(a =>
+        `<div class="ai-item"><span style="font-weight:600;">${a.subject}: ${a.title.substring(0,40)}...</span><span class="badge badge-warning">${getDaysUntil(a.dueDate)} days</span></div>`
+      ).join('');
+      addAIMessage(`You have <strong>${pending.length} pending assignment(s)</strong>:`, false,
+        `<div class="ai-list">${list || '<div style="color:var(--success);">All assignments submitted! ✅</div>'}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-assignments')">📝 View All Assignments</button>`);
     } else if (q.includes('exam')) {
-      const exams = APP_DATA.upcomingExams;
-      const list = exams.map(e => `<div class="ai-item"><span>${e.subject}</span><span class="badge badge-info">${formatDate(e.date)} ${e.time}</span></div>`).join('');
-      addAIMessage(`You have <strong>${exams.length} upcoming exams</strong>:`, false, `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-exams')">📚 View Exam Schedule</button>`);
+      const list = APP_DATA.upcomingExams.map(e =>
+        `<div class="ai-item"><span><strong>${e.subject}</strong> (${e.type})</span><span class="badge badge-info">${formatDateShort(e.date)}</span></div>`
+      ).join('');
+      addAIMessage(`You have <strong>${APP_DATA.upcomingExams.length} upcoming exams</strong>:`, false,
+        `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-exams')">📚 View Exam Schedule</button>`);
     } else if (q.includes('event')) {
-      const upcoming = APP_DATA.events.filter(e => e.status === 'upcoming').slice(0, 3);
-      const list = upcoming.map(e => `<div class="ai-item"><span>${e.title}</span><span class="badge badge-primary">${formatDate(e.date)}</span></div>`).join('');
-      addAIMessage(`Here are upcoming events:`, false, `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-events')">🎉 View Events</button>`);
+      const upcoming = APP_DATA.events.filter(e => e.status === 'upcoming').slice(0,3);
+      const list = upcoming.map(e => `<div class="ai-item"><span>${e.emoji} <strong>${e.title}</strong></span><span class="badge badge-primary">${formatDateShort(e.date)}</span></div>`).join('');
+      addAIMessage(`Here are the upcoming events:`, false,
+        `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-events')">🎉 View All Events</button>`);
     } else if (q.includes('notice') || q.includes('announcement')) {
-      const important = APP_DATA.notices.filter(n => n.priority === 'urgent' || n.priority === 'high').slice(0, 3);
-      const list = important.map(n => `<div class="ai-item"><span>${n.title}</span><span class="badge badge-${n.priority === 'urgent' ? 'danger' : 'warning'}">${n.priority.toUpperCase()}</span></div>`).join('');
-      addAIMessage(`Important notices:`, false, `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm mt-2" onclick="navigate('student-notices')">📰 View Notices</button>`);
+      const imp = APP_DATA.notices.filter(n => n.priority === 'urgent' || n.priority === 'high').slice(0,3);
+      const list = imp.map(n => `<div class="ai-item"><span>${n.title}</span><span class="badge badge-${n.priority==='urgent'?'danger':'warning'}">${n.priority.toUpperCase()}</span></div>`).join('');
+      addAIMessage(`Important notices for you:`, false,
+        `<div class="ai-list">${list}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('student-notices')">📢 View All Notices</button>`);
     } else if (q.includes('leave')) {
-      addAIMessage(`I can help you apply for leave.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('student-leave')">📝 Apply for Leave</button>`);
-    } else if (q.includes('placement') || q.includes('job') || q.includes('company') || q.includes('career')) {
-      const cgpa = calculateCGPA(APP_DATA.semesterResults[user.id]);
-      addAIMessage(`Based on your CGPA of <strong>${cgpa}</strong> and ${user.department} branch, here are upcoming placement drives:`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('student-placements')">💼 View Placements</button>`);
+      addAIMessage(`I can help you apply for leave. Click below:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('student-leave')">📋 Apply for Leave</button>`);
+    } else if (q.includes('placement') || q.includes('job') || q.includes('company')) {
+      addAIMessage(`Based on your CGPA of <strong>${cgpa}</strong>, you may be eligible for Google, Microsoft, TCS, and Infosys! 🎯`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('student-placements')">💼 View Placements</button>`);
+    } else if (q.includes('faculty') || q.includes('professor') || q.includes('who teach')) {
+      addAIMessage(`I'll show you the faculty directory:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-directory')">👨‍🏫 Open Faculty Directory</button>`);
+    } else if (q.includes('material') || q.includes('resource') || q.includes('notes') || q.includes('pdf')) {
+      addAIMessage(`Here are your study resources:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('student-resources')">📚 Open Study Materials</button>`);
     } else if (q.includes('club')) {
-      addAIMessage(`VIT has 5 active clubs. Explore and join them!`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('student-clubs')">🤝 View Clubs</button>`);
-    } else if (q.includes('faculty') || q.includes('professor') || q.includes('teacher')) {
-      addAIMessage(`Looking up faculty information for you.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-directory')">👨‍🏫 Faculty Directory</button>`);
-    } else if (q.includes('material') || q.includes('resource') || q.includes('note') || q.includes('pdf')) {
-      addAIMessage(`Showing study materials for your semester.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('student-resources')">📚 Study Resources</button>`);
+      addAIMessage(`VIT has 5 active clubs. Check them out!`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('student-clubs')">🤝 View Clubs</button>`);
     } else if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-      addAIMessage(`Hello ${user.name.split(' ')[0]}! 😊 Ask me about attendance, CGPA, timetable, assignments, exams, events, or anything campus-related!`);
+      addAIMessage(`Hello ${user.name.split(' ')[0]}! 😊 How can I help you today?`);
       showAISuggestions();
-    } else if (q.includes('help') || q.includes('what can')) {
-      addAIMessage(`I can help you with:<br>• <strong>Attendance</strong> – Subject-wise attendance<br>• <strong>CGPA</strong> – Academic performance<br>• <strong>Timetable</strong> – Today's classes<br>• <strong>Assignments</strong> – Pending/upcoming<br>• <strong>Exams</strong> – Schedule & syllabus<br>• <strong>Events</strong> – Campus events<br>• <strong>Placements</strong> – Job drives<br>• <strong>Leave</strong> – Apply for leave`);
+    } else if (q.includes('help') || q.includes('what can you do')) {
+      addAIMessage(`I can help you with:<br>
+        📅 <strong>Attendance</strong> · 📊 <strong>CGPA</strong> · ⏰ <strong>Timetable</strong><br>
+        📝 <strong>Assignments</strong> · 📚 <strong>Exams</strong> · 🎉 <strong>Events</strong><br>
+        📢 <strong>Notices</strong> · 📋 <strong>Leave</strong> · 💼 <strong>Placements</strong><br><br>
+        Just ask me naturally!`);
     } else {
-      addAIMessage(`I'm not sure I understood that. Here are some things you can ask:`, false, `<div class="ai-list"><div class="ai-item" onclick="document.getElementById('ai-input').value='What is my attendance?';sendAIMessage()" style="cursor:pointer">What is my attendance?</div><div class="ai-item" onclick="document.getElementById('ai-input').value='What is my CGPA?';sendAIMessage()" style="cursor:pointer">What is my CGPA?</div><div class="ai-item" onclick="document.getElementById('ai-input').value='What classes do I have today?';sendAIMessage()" style="cursor:pointer">What classes today?</div></div>`);
+      addAIMessage(`I couldn't find a specific answer. Try asking about your attendance, CGPA, assignments, or events.`, false,
+        `<div class="ai-list"><div class="ai-item" onclick="document.getElementById('ai-input').value='What is my attendance?';sendAIMessage()" style="cursor:pointer;">What is my attendance?</div><div class="ai-item" onclick="document.getElementById('ai-input').value='Show upcoming events';sendAIMessage()" style="cursor:pointer;">Show upcoming events</div></div>`);
       showAISuggestions();
     }
-
   } else if (user.role === 'faculty') {
+    const pending = APP_DATA.leaveApplications.filter(l => l.status === 'pending');
     if (q.includes('class') || q.includes('today') || q.includes('schedule') || q.includes('timetable')) {
-      const tt = APP_DATA.timetable[user.id];
-      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-      const today = days[new Date().getDay()];
-      const todayClasses = (tt && (tt[today] || tt['Monday'])) || [];
-      addAIMessage(`You have <strong>${todayClasses.length} class(es)</strong> today.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-timetable')">📅 View Timetable</button>`);
+      addAIMessage(`You have ${(APP_DATA.timetable[user.id]?.Monday || []).length} classes today.`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-timetable')">⏰ View Timetable</button>`);
     } else if (q.includes('attendance')) {
-      addAIMessage(`Click below to mark attendance for your classes.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-attendance')">✅ Mark Attendance</button>`);
-    } else if (q.includes('assignment')) {
-      addAIMessage(`Manage or create assignments for your students.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-assignments')">📝 Manage Assignments</button>`);
+      addAIMessage(`Click below to mark attendance:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-attendance')">✅ Mark Attendance</button>`);
     } else if (q.includes('leave') || q.includes('request')) {
-      const leaves = Object.values(APP_DATA.leaveApplications).flat();
-      const pending = leaves.filter(l => l.status === 'pending');
-      addAIMessage(`You have <strong>${pending.length} pending leave request(s)</strong>.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-leave-requests')">📋 View Requests</button>`);
+      addAIMessage(`You have <strong>${pending.length} pending leave request(s)</strong>.`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-leave-requests')">📋 View Requests</button>`);
     } else if (q.includes('student') || q.includes('performance')) {
-      addAIMessage(`View your students' attendance and academic performance.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-students')">👨‍🎓 View Students</button>`);
+      addAIMessage(`Showing student list and performance:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-students')">👨‍🎓 View Students</button>`);
+    } else if (q.includes('assignment')) {
+      addAIMessage(`Manage your assignments here:`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('faculty-assignments')">📝 Assignments</button>`);
     } else {
-      addAIMessage(`Hello ${user.name.split(' ')[0]}! I can help with classes, attendance, assignments, and student management.`);
+      addAIMessage(`Hi ${user.name.split(' ')[0]}! How can I help?`);
       showAISuggestions();
     }
-
   } else if (user.role === 'admin') {
+    const stats = APP_DATA.adminStats;
     if (q.includes('student') || q.includes('enrolled')) {
-      addAIMessage(`<strong>${APP_DATA.adminStats.enrollmentTrend.slice(-1)[0].students.toLocaleString()}</strong> students enrolled across ${APP_DATA.departments.length} departments.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-students')">👨‍🎓 Manage Students</button>`);
+      const deptList = APP_DATA.departments.map(d => `<div class="ai-item"><span>${d.name}</span><span class="badge badge-primary">${d.students}</span></div>`).join('');
+      addAIMessage(`<strong>${stats.totalStudents.toLocaleString()}</strong> students enrolled across ${APP_DATA.departments.length} departments:`, false,
+        `<div class="ai-list">${deptList}</div><button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="navigate('admin-students')">👨‍🎓 Manage Students</button>`);
     } else if (q.includes('cgpa') || q.includes('performance')) {
-      addAIMessage(`College average CGPA: <strong>7.82</strong>. Best performing dept: CSE (8.4).`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-reports')">📊 View Reports</button>`);
+      addAIMessage(`College average CGPA: <strong>${stats.avgCGPA}/10</strong>`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('admin-reports')">📊 View Reports</button>`);
     } else if (q.includes('attendance')) {
-      addAIMessage(`College-wide average attendance: <strong>86.2%</strong>.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-reports')">📊 View Reports</button>`);
+      addAIMessage(`College average attendance: <strong>${stats.avgAttendance}%</strong>`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('admin-reports')">📊 View Reports</button>`);
     } else if (q.includes('application') || q.includes('pending')) {
-      const leaves = Object.values(APP_DATA.leaveApplications).flat().filter(l => l.status === 'pending');
-      addAIMessage(`There are <strong>${leaves.length + 2} pending applications</strong>.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-applications')">📋 View Applications</button>`);
+      addAIMessage(`<strong>${stats.pendingApplications}</strong> pending applications await action.`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('admin-applications')">📋 View Applications</button>`);
     } else if (q.includes('complaint')) {
-      const complaints = Object.values(APP_DATA.complaints).flat().filter(c => c.status === 'pending');
-      addAIMessage(`There are <strong>${complaints.length} unresolved complaints</strong>.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-applications')">📋 View Complaints</button>`);
+      addAIMessage(`<strong>${stats.pendingComplaints}</strong> unresolved complaints.`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('admin-applications')">📋 View Complaints</button>`);
     } else if (q.includes('event')) {
-      addAIMessage(`There are <strong>${APP_DATA.events.filter(e=>e.status==='upcoming').length} upcoming events</strong>.`, false, `<button class="btn btn-primary btn-sm" onclick="navigate('admin-events')">🎉 Manage Events</button>`);
+      addAIMessage(`<strong>${stats.activeEvents}</strong> active upcoming events.`, false,
+        `<button class="btn btn-primary btn-sm" onclick="navigate('admin-events')">🎉 Manage Events</button>`);
     } else {
-      addAIMessage(`Welcome, ${user.name.split(' ')[0]}! I can provide college stats, pending applications, complaint status, and more.`);
+      addAIMessage(`Welcome, ${user.name.split(' ')[0]}! I can provide college stats, pending applications, reports and more.`);
       showAISuggestions();
     }
   }
@@ -3761,58 +3362,52 @@ function processAIQuery(query) {
 
 function showAISuggestions() {
   const user = APP_STATE.currentUser;
-  if (!user) return;
-  const suggestions = {
-    student: ['What is my CGPA?', "What classes do I have today?", 'Which assignments are due?', 'Show upcoming events'],
-    faculty: ["Show today's classes", 'Show pending assignments', 'Show leave requests', 'Show student list'],
-    admin: ['How many students are enrolled?', 'Show pending applications', 'What is average CGPA?', 'Show upcoming events']
-  };
   const el = document.getElementById('ai-suggestions');
-  if (!el) return;
+  if (!el || !user) return;
+  const suggestions = {
+    student: ['What is my CGPA?', 'What is my attendance?', 'What classes do I have today?', 'Which assignments are due?'],
+    faculty: ["Today's classes?", 'Show pending assignments', 'Show leave requests', 'Show student performance'],
+    admin: ['How many students are enrolled?', 'Show pending applications', 'What is the average CGPA?', 'Show upcoming events']
+  };
   el.innerHTML = (suggestions[user.role] || []).map(s =>
     `<button class="ai-suggestion" onclick="document.getElementById('ai-input').value='${s}';sendAIMessage()">${s}</button>`
   ).join('');
 }
 
 function initAISuggestions() {
-  const el = document.getElementById('ai-suggestions');
-  if (el && APP_STATE.currentUser) showAISuggestions();
+  if (APP_STATE.currentUser) {
+    const el = document.getElementById('ai-suggestions');
+    if (el) showAISuggestions();
+  }
 }
 
 function clearChat() {
-  const el = document.getElementById('ai-messages');
-  if (el) el.innerHTML = '';
+  const messagesEl = document.getElementById('ai-messages');
+  if (messagesEl) messagesEl.innerHTML = '';
   initAIChat();
 }
 
-// ─────────────────────────────────────────────────────────────
-// HELPER UI FUNCTIONS
-// ─────────────────────────────────────────────────────────────
+// ============================================================
+// UI HELPER FUNCTIONS
+// ============================================================
 function showToast(message, type = 'info') {
   const container = document.getElementById('toast-container');
   if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  const icons = { success:'✅', error:'❌', warning:'⚠️', info:'ℹ️' };
-  toast.innerHTML = `
-    <span class="toast-icon">${icons[type] || 'ℹ️'}</span>
-    <span class="toast-message">${message}</span>
-    <button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
+  const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+  toast.innerHTML = `<span class="toast-icon">${icons[type] || 'ℹ️'}</span><span class="toast-message">${message}</span><button class="toast-close" onclick="this.parentElement.remove()">✕</button>`;
   container.appendChild(toast);
-  setTimeout(() => toast.classList.add('visible'), 10);
-  setTimeout(() => {
-    toast.classList.remove('visible');
-    setTimeout(() => { if (toast.parentElement) toast.remove(); }, 300);
-  }, 3500);
+  requestAnimationFrame(() => { requestAnimationFrame(() => { toast.classList.add('visible'); }); });
+  setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 350); }, 3500);
 }
 
 function toggleTheme() {
   APP_STATE.currentTheme = APP_STATE.currentTheme === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', APP_STATE.currentTheme);
-  localStorage.setItem('theme', APP_STATE.currentTheme);
-  const themeIcon = document.getElementById('theme-icon');
-  if (themeIcon) themeIcon.textContent = APP_STATE.currentTheme === 'dark' ? '☀️' : '🌙';
-  showToast(`${APP_STATE.currentTheme === 'dark' ? 'Dark' : 'Light'} mode enabled`, 'info');
+  localStorage.setItem('cc-theme', APP_STATE.currentTheme);
+  const icons = document.querySelectorAll('#theme-icon, #landing-theme-icon');
+  icons.forEach(i => { if (i) i.textContent = APP_STATE.currentTheme === 'dark' ? '☀️' : '🌙'; });
 }
 
 function toggleSidebar() {
@@ -3823,27 +3418,29 @@ function toggleSidebar() {
     sidebar.classList.toggle('open', APP_STATE.sidebarOpen);
     sidebar.classList.toggle('closed', !APP_STATE.sidebarOpen);
   }
-  if (overlay) overlay.classList.toggle('visible', APP_STATE.sidebarOpen && window.innerWidth < 1024);
+  if (overlay) overlay.classList.toggle('visible', APP_STATE.sidebarOpen && window.innerWidth < 1025);
 }
 
 function bindSidebarEvents() {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar) return;
-  if (APP_STATE.sidebarOpen) { sidebar.classList.add('open'); sidebar.classList.remove('closed'); }
-  else { sidebar.classList.remove('open'); sidebar.classList.add('closed'); }
-  // On mobile, keep overlay synced
-  const overlay = document.getElementById('sidebar-overlay');
-  if (overlay) overlay.classList.toggle('visible', APP_STATE.sidebarOpen && window.innerWidth < 1024);
+  const isDesktop = window.innerWidth > 1024;
+  if (isDesktop) {
+    sidebar.classList.add('open');
+    sidebar.classList.remove('closed');
+  } else {
+    sidebar.classList.toggle('open', APP_STATE.sidebarOpen);
+    sidebar.classList.toggle('closed', !APP_STATE.sidebarOpen);
+  }
 }
 
 function navigate(page, params = {}) {
   const dropdown = document.getElementById('user-dropdown');
   if (dropdown) dropdown.classList.remove('visible');
-  // On mobile, close sidebar on navigation
-  if (window.innerWidth < 1024) {
+  const overlay = document.getElementById('sidebar-overlay');
+  if (overlay && window.innerWidth < 1025) {
+    overlay.classList.remove('visible');
     APP_STATE.sidebarOpen = false;
-    const overlay = document.getElementById('sidebar-overlay');
-    if (overlay) overlay.classList.remove('visible');
   }
   renderPage(page, params);
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3852,38 +3449,67 @@ function navigate(page, params = {}) {
 function toggleUserMenu() {
   const dropdown = document.getElementById('user-dropdown');
   if (dropdown) dropdown.classList.toggle('visible');
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', function closeMenu(e) {
-      if (!e.target.closest('.user-menu')) {
-        const d = document.getElementById('user-dropdown');
-        if (d) d.classList.remove('visible');
-        document.removeEventListener('click', closeMenu);
-      }
-    });
-  }, 10);
+}
+
+function toggleNavLoginMenu() {
+  const menu = document.getElementById('nav-login-menu');
+  if (menu) menu.classList.toggle('visible');
 }
 
 function openModal(content) {
   const overlay = document.getElementById('modal-overlay');
-  const modalContent = document.getElementById('modal-content');
-  if (overlay && modalContent) {
-    modalContent.innerHTML = content;
+  const mc = document.getElementById('modal-content');
+  if (overlay && mc) {
+    mc.innerHTML = content;
     overlay.classList.add('visible');
   }
 }
 
-function closeModal(force) {
-  if (force === true || (force && force.target === document.getElementById('modal-overlay'))) {
+function closeModal(force = false) {
+  if (force === true) {
     const overlay = document.getElementById('modal-overlay');
     if (overlay) overlay.classList.remove('visible');
   }
 }
 
+// Handle modal overlay click
+document.getElementById('modal-overlay')?.addEventListener('click', function(e) {
+  if (e.target === this) closeModal(true);
+});
+
 function updateActiveSidebarItem() {
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
     el.classList.toggle('active', el.dataset.page === APP_STATE.currentPage);
   });
+}
+
+// Global search
+function handleGlobalSearch(query) {
+  const dropdown = document.getElementById('search-dropdown');
+  if (!dropdown || !query || query.length < 2) { if (dropdown) dropdown.classList.remove('visible'); return; }
+  const results = [];
+  APP_DATA.events.filter(e => e.title.toLowerCase().includes(query.toLowerCase())).slice(0, 3)
+    .forEach(e => results.push({ label: e.title, icon: '🎉', page: APP_STATE.currentUser?.role === 'admin' ? 'admin-events' : 'student-events', type: 'Event' }));
+  APP_DATA.notices.filter(n => n.title.toLowerCase().includes(query.toLowerCase())).slice(0, 3)
+    .forEach(n => results.push({ label: n.title, icon: '📢', page: APP_STATE.currentUser?.role === 'admin' ? 'admin-notices' : 'student-notices', type: 'Notice' }));
+  APP_DATA.faculty.filter(f => f.name.toLowerCase().includes(query.toLowerCase()) || f.subjects.some(s => s.toLowerCase().includes(query.toLowerCase()))).slice(0, 2)
+    .forEach(f => results.push({ label: f.name, icon: '👨‍🏫', page: 'faculty-directory', type: 'Faculty' }));
+  APP_DATA.studyResources.filter(r => r.title.toLowerCase().includes(query.toLowerCase())).slice(0, 2)
+    .forEach(r => results.push({ label: r.title, icon: '📚', page: 'student-resources', type: 'Resource' }));
+
+  if (!results.length) {
+    dropdown.innerHTML = '<div class="search-empty">No results found</div>';
+  } else {
+    dropdown.innerHTML = results.map(r => `
+    <div class="search-result-item" onclick="navigate('${r.page}');hideSearchDropdown();">
+      <span>${r.icon}</span>
+      <div>
+        <div class="search-result-label">${r.label}</div>
+        <div class="search-result-type">${r.type}</div>
+      </div>
+    </div>`).join('');
+  }
+  dropdown.classList.add('visible');
 }
 
 function showSearchDropdown() {
@@ -3896,38 +3522,62 @@ function hideSearchDropdown() {
   if (d) d.classList.remove('visible');
 }
 
+// Leave actions
+function approveLeave(leaveId) {
+  const leave = APP_DATA.leaveApplications.find(l => l.id === leaveId);
+  if (leave) {
+    leave.status = 'approved';
+    leave.reviewedBy = APP_STATE.currentUser.name;
+    leave.reviewDate = new Date().toISOString().split('T')[0];
+    leave.remarks = leave.remarks || 'Application approved.';
+  }
+  showToast('Leave application approved ✅', 'success');
+  navigate(APP_STATE.currentPage);
+}
+
+function rejectLeave(leaveId) {
+  const leave = APP_DATA.leaveApplications.find(l => l.id === leaveId);
+  if (leave) {
+    leave.status = 'rejected';
+    leave.reviewedBy = APP_STATE.currentUser.name;
+    leave.reviewDate = new Date().toISOString().split('T')[0];
+  }
+  showToast('Leave application rejected', 'info');
+  navigate(APP_STATE.currentPage);
+}
+
+// Event registration
 function registerForEvent(eventId) {
   const event = APP_DATA.events.find(e => e.id === eventId);
   if (!event) return;
   const user = APP_STATE.currentUser;
   if (!user) { showToast('Please login to register.', 'warning'); return; }
-  if (!event.registered) event.registered = [];
-  if (event.registered.includes(user.id) || event.isRegistered) {
-    showToast('You are already registered!', 'warning'); return;
-  }
+  if (event.registered.includes(user.id)) { showToast('Already registered!', 'warning'); return; }
+  if (event.registeredSeats >= event.seats) { showToast('No seats available.', 'error'); return; }
   event.registered.push(user.id);
-  event.registeredCount++;
-  event.isRegistered = true;
-  showToast(`Successfully registered for ${event.title}! 🎉`, 'success');
+  event.registeredSeats++;
+  showToast(`Registered for "${event.title}"! 🎉`, 'success');
   navigate(APP_STATE.currentPage);
 }
 
-// ─────────────────────────────────────────────────────────────
-// WINDOW RESIZE HANDLER
-// ─────────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-  if (window.innerWidth > 1024 && !APP_STATE.sidebarOpen) {
-    APP_STATE.sidebarOpen = true;
-    bindSidebarEvents();
-  } else if (window.innerWidth <= 1024 && APP_STATE.sidebarOpen) {
-    // Keep sidebar closed on mobile unless explicitly opened
-  }
-});
+// Mark all notifications as read
+function markAllRead() {
+  APP_STATE.notifications.forEach(n => n.read = true);
+  APP_DATA.notifications.forEach(n => n.read = true);
+  showToast('All notifications marked as read ✅', 'success');
+  navigate('notifications');
+}
 
-// Close dropdowns on outside click
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('#login-dropdown') && !e.target.closest('.login-dropdown-wrapper')) {
-    const d = document.getElementById('login-dropdown');
-    if (d) d.classList.remove('visible');
+// Utility
+function capitalize(str) { return str ? str.charAt(0).toUpperCase() + str.slice(1) : ''; }
+
+// Handle window resize
+window.addEventListener('resize', () => {
+  if (window.innerWidth > 1024) {
+    APP_STATE.sidebarOpen = true;
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (sidebar) { sidebar.classList.add('open'); sidebar.classList.remove('closed'); }
+    if (overlay) overlay.classList.remove('visible');
   }
 });
